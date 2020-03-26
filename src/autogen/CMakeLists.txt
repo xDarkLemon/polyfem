@@ -7,6 +7,9 @@ set(AUTOGEN
 	auto_p_bases.hpp
 	auto_q_bases.cpp
 	auto_q_bases.hpp
+
+	auto_3D_P1_non_zero_grad.c
+	auto_3D_P1_non_zero_hessian.c
 )
 
 set(SOURCES

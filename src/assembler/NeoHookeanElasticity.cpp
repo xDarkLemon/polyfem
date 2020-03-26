@@ -6,8 +6,12 @@
 #include <polyfem/auto_elasticity_rhs.hpp>
 
 #include <polyfem/MatrixUtils.hpp>
+#include <polyfem/Logger.hpp>
+
 #include <igl/Timer.h>
 
+extern "C" void compute_p1_hessian(int num_points, double ders[], double grads[], double vjac_it[], double da[], double local_disp[]);
+extern "C" void compute_p1_grd(int num_points, double ders[], double grads[], double vjac_it[], double da[], double local_disp[], double mu, double lambda);
 
 namespace polyfem
 {
@@ -53,6 +57,10 @@ namespace polyfem
 	NeoHookeanElasticity::assemble(const ElementAssemblyValues &vals, const Eigen::MatrixXd &displacement, const QuadratureVector &da) const
 	{
 		const int n_bases = vals.basis_values.size();
+		if (size() == 3){
+			if(n_bases == 4)
+				return compute_energy_grad_autodiff(vals, displacement, da);
+		}
 
 		return polyfem::gradient_from_energy(size(), n_bases, vals, displacement, da,
 			[&](const ElementAssemblyValues &vals, const Eigen::MatrixXd &displacement, const QuadratureVector &da) { return compute_energy_aux<DScalar1<double, Eigen::Matrix<double, 6, 1>>>(vals, displacement, da); },
@@ -217,5 +225,89 @@ namespace polyfem
 			energy += val * da(p);
 		}
 		return energy;
+	}
+
+	Eigen::VectorXd NeoHookeanElasticity::compute_energy_grad_autodiff(const ElementAssemblyValues &vals, const Eigen::MatrixXd &displacement, const QuadratureVector &da) const
+	{
+		const int n_pts = da.size();
+
+		std::vector<double> local_disp(vals.basis_values.size() * size());
+		std::fill(local_disp.begin(), local_disp.end(), 0);
+		for (size_t i = 0; i < vals.basis_values.size(); ++i)
+		{
+			const auto &bs = vals.basis_values[i];
+			for (size_t ii = 0; ii < bs.global.size(); ++ii)
+			{
+				for (int d = 0; d < size(); ++d)
+				{
+					local_disp[i * size() + d] += bs.global[ii].val * displacement(bs.global[ii].index * size() + d);
+				}
+			}
+		}
+
+		std::vector<double> grads;
+		std::vector<double> vjac_it;
+		std::vector<double> das;
+
+		for (long p = 0; p < n_pts; ++p)
+		{
+			for (size_t i = 0; i < vals.basis_values.size(); ++i)
+			{
+				const auto &bs = vals.basis_values[i];
+				const Eigen::Matrix<double, Eigen::Dynamic, 1, 0, 3, 1> grad = bs.grad.row(p);
+				assert(grad.size() == size());
+				for (int c = 0; c < size(); ++c)
+				{
+					grads.push_back(grad(c));
+				}
+			}
+
+			for (long k = 0; k < size() * size(); ++k)
+				vjac_it.push_back(vals.jac_it[p](k));
+
+			das.push_back(da(p));
+		}
+
+		std::vector<double> ders(local_disp.size());
+		double lambda, mu;
+		params_.lambda_mu(vals.val(0, 0), vals.val(0, 1), size_ == 2 ? 0. : vals.val(0, 2), vals.element_id, lambda, mu);
+
+		compute_p1_grd(n_pts, &ders[0], &grads[0], &vjac_it[0], &das[0], &local_disp[0], lambda, mu);
+
+		Eigen::VectorXd res(ders.size());
+		for (int i = 0; i < res.size(); ++i)
+			res[i] = ders[i];
+
+		std::stringstream ss; ss<<"\n";
+
+		ss << "grads\n";
+		for(double v : grads)
+			ss << v << std::endl;
+		ss << "das\n";
+		for (double v : das)
+			ss << v << std::endl;
+		ss << "vjac_it\n";
+		for (double v : vjac_it)
+			ss <<  v << std::endl;
+		ss << "local_disp\n";
+		for (double v : local_disp)
+			ss <<  v << std::endl;
+
+
+
+
+		const auto xx = compute_energy_aux<DScalar1<double, Eigen::Matrix<double, 12, 1>>>(vals, displacement, da);
+		Eigen::VectorXd tmp = xx.getGradient();
+		std::stringstream ss1;
+
+		ss <<"errors: \n";
+		for (int i = 0; i < res.size(); ++i)
+		{
+			ss << tmp[i] <<" "<< res[i]<<" " << (tmp[i] - res[i]) << std::endl;
+		}
+		logger().info("{}", ss.str());
+
+		exit(0);
+		return res;
 	}
 }

@@ -269,10 +269,11 @@ namespace polyfem
 		}
 
 		std::vector<double> ders(local_disp.size());
+		std::fill(ders.begin(), ders.end(), 0);
 		double lambda, mu;
 		params_.lambda_mu(vals.val(0, 0), vals.val(0, 1), size_ == 2 ? 0. : vals.val(0, 2), vals.element_id, lambda, mu);
 
-		compute_p1_grd(n_pts, &ders[0], &grads[0], &vjac_it[0], &das[0], &local_disp[0], lambda, mu);
+		compute_p1_grd(n_pts, &ders[0], &grads[0], &vjac_it[0], &das[0], &local_disp[0], mu, lambda);
 
 		Eigen::VectorXd res(ders.size());
 		for (int i = 0; i < res.size(); ++i)

@@ -157,7 +157,7 @@ State::State()
 	const size_t MB = 1024 * 1024;
 	const size_t stack_size = 64 * MB;
 	unsigned int num_threads = std::max(1u, std::thread::hardware_concurrency());
-	tbb::task_scheduler_init scheduler(num_threads, stack_size);
+	tbb::task_scheduler_init scheduler(1);
 #endif
 
 	// Import standard command line arguments, and custom ones

@@ -46,7 +46,9 @@ namespace polyfem
 
 		void assign_stress_tensor(const ElementBases &bs, const ElementBases &gbs, const Eigen::MatrixXd &local_pts, const Eigen::MatrixXd &displacement, const int all_size, Eigen::MatrixXd &all, const std::function<Eigen::MatrixXd(const Eigen::MatrixXd &)> &fun) const;
 
+		void compute_energy_grad_hess_autodiff_aux(const ElementAssemblyValues &vals, const Eigen::MatrixXd &displacement, const QuadratureVector &da, const bool hess, std::vector<double> &ders) const;
 		Eigen::VectorXd compute_energy_grad_autodiff(const ElementAssemblyValues &vals, const Eigen::MatrixXd &displacement, const QuadratureVector &da) const;
+		Eigen::MatrixXd compute_energy_hess_autodiff(const ElementAssemblyValues &vals, const Eigen::MatrixXd &displacement, const QuadratureVector &da) const;
 	};
 }
 

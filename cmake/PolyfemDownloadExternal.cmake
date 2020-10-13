@@ -27,7 +27,7 @@ endfunction()
 function(polyfem_download_libigl)
     polyfem_download_project(libigl
         GIT_REPOSITORY https://github.com/libigl/libigl.git
-        GIT_TAG        c7c06e3735cdf6188bd17507403362065c4ae9dc
+        GIT_TAG        062e3823c35cb868bf51cc8c247b04b7fa91c30f
     )
 endfunction()
 
@@ -98,7 +98,7 @@ endfunction()
 ## hypre GNU Lesser General Public License
 function(polyfem_download_hypre)
     polyfem_download_project(hypre
-        GIT_REPOSITORY https://github.com/LLNL/hypre.git
+        GIT_REPOSITORY https://github.com/hypre-space/hypre.git
         GIT_TAG        v2.15.1
     )
 

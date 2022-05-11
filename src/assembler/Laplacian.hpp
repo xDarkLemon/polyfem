@@ -17,7 +17,7 @@ namespace polyfem
 		//vals stores the evaluation for that element
 		//da contains both the quadrature weight and the change of metric in the integral
 		Eigen::Matrix<double, 1, 1> assemble(const ElementAssemblyValues &vals, const int i, const int j, const QuadratureVector &da) const;
-
+		
 		//uses autodiff to compute the rhs for a fabricated solution
 		//in this case it just return pt.getHessian().trace()
 		//pt is the evaluation of the solution at a point

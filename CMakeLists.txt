@@ -7,7 +7,7 @@ else()
 endif()
 
 # Check required CMake version
-set(REQUIRED_CMAKE_VERSION "3.14.0")
+set(REQUIRED_CMAKE_VERSION "3.19.0")
 if(POLYFEM_TOPLEVEL_PROJECT)
     cmake_minimum_required(VERSION ${REQUIRED_CMAKE_VERSION})
 else()
@@ -304,6 +304,7 @@ if(POLYFEM_TOPLEVEL_PROJECT)
     endif()
 
     target_compile_features(${PROJECT_NAME}_bin PUBLIC ${CXX14_FEATURES})
+
     include(cli11)
     target_link_libraries(${PROJECT_NAME}_bin
         PUBLIC
@@ -344,7 +345,7 @@ endif()
 # CUDA
 ################################################################################
 
-if(IPC_TOOLKIT_WITH_CUDA)
+if(1)
   include(CheckLanguage)
   check_language(CUDA)
   if(CMAKE_CUDA_COMPILER)

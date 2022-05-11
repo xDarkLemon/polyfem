@@ -1,5 +1,4 @@
 #include <polyfem/Laplacian.hpp>
-
 #include <iostream>
 
 namespace polyfem
@@ -15,6 +14,9 @@ namespace polyfem
 		}
 		return Eigen::Matrix<double, 1, 1>::Constant(res);
 	}
+
+
+
 
 	Eigen::Matrix<double, 1, 1> Laplacian::compute_rhs(const AutodiffHessianPt &pt) const
 	{

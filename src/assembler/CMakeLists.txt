@@ -22,6 +22,7 @@ set(SOURCES
 	MassMatrixAssembler.hpp
 	MultiModel.cpp
 	MultiModel.hpp
+	NeoHookeanElasticity_GPU.cu
 	NeoHookeanElasticity.cpp
 	NeoHookeanElasticity.hpp
 	# OgdenElasticity.cpp

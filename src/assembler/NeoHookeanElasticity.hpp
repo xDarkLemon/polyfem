@@ -25,6 +25,8 @@ namespace polyfem
 
 		double compute_energy(const ElementAssemblyValues &vals, const Eigen::MatrixXd &displacement, const QuadratureVector &da) const;
 
+		double compute_energy_gpu(const ElementAssemblyValues &vals, const Eigen::MatrixXd &displacement, const QuadratureVector &da);
+
 		//rhs for fabbricated solution, compute with automatic sympy code
 		Eigen::Matrix<double, Eigen::Dynamic, 1, 0, 3, 1>
 		compute_rhs(const AutodiffHessianPt &pt) const;
@@ -52,6 +54,9 @@ namespace polyfem
 		//utulity function that computes energy, the template is used for double, DScalar1, and DScalar2 in energy, gradient and hessian
 		template <typename T>
 		T compute_energy_aux(const ElementAssemblyValues &vals, const Eigen::MatrixXd &displacement, const QuadratureVector &da) const;
+
+		double compute_energy_aux_gpu(const ElementAssemblyValues &vals, const Eigen::MatrixXd &displacement, const QuadratureVector &da);
+
 		template <int n_basis, int dim>
 		void compute_energy_hessian_aux_fast(const ElementAssemblyValues &vals, const Eigen::MatrixXd &displacement, const QuadratureVector &da, Eigen::MatrixXd &H) const;
 		template <int n_basis, int dim>

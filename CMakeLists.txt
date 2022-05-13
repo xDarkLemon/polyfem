@@ -156,7 +156,7 @@ polyfem_autogen(polyfem elasticity_rhs.py auto_elasticity_rhs)
 target_include_directories(polyfem PUBLIC ${PROJECT_BINARY_DIR}/include)
 
 # Extra warnings
-target_link_libraries(polyfem PRIVATE warnings::all)
+# target_link_libraries(polyfem PRIVATE warnings::all)
 
 
 # Use C++17
@@ -345,7 +345,7 @@ endif()
 # CUDA
 ################################################################################
 
-if(1)
+# if(1)
   include(CheckLanguage)
   check_language(CUDA)
   if(CMAKE_CUDA_COMPILER)
@@ -355,7 +355,9 @@ if(1)
   endif()
 
   set_target_properties(polyfem PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
-
+  #  foreach(flag IN LISTS ${CXX17_FEATURES})
+  #  add_compile_options("$<$<COMPILE_LANGUAGE:CUDA>:--compiler-options=${flag}>")
+  # endforeach()
   # Nvidia RTX8000 -> compute_75
   # Nvidia V100 -> compute_70
   # Nvidia 1080/1080Ti -> compute_61
@@ -365,4 +367,4 @@ if(1)
   endif()
   set_target_properties(polyfem PROPERTIES CUDA_ARCHITECTURES "70;75;86")
   set_target_properties(PolyFEM_bin PROPERTIES CUDA_ARCHITECTURES "70;75;86")
-endif()
+  # endif()

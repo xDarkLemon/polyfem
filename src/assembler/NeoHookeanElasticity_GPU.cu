@@ -2,6 +2,7 @@
 
 #include <cuda.h>
 #include <cuda_runtime.h>
+#define NUMBER_THREADS  32
 
 #include <polyfem/Basis.hpp>
 #include <polyfem/auto_elasticity_rhs.hpp>
@@ -11,17 +12,28 @@
 namespace polyfem
 {
 
-	__global__ void set_dispv(Eigen::Vector3f *v1,double bvs_val, double disp_val, double* local_disp)
+	__global__ void set_dispv(const Local2Global **bvs_data, Eigen::Matrix<size_t, Eigen::Dynamic,1> &bvs_sizes , const Eigen::MatrixXd &displacement , int size,int bvs_total_size, double* local_disp)
 	{
-		Eigen::MatrixXd lulz(3,1);
-		local_disp[0] +=  bvs_val * disp_val;
-/*				for (int d = 0; d < size; ++d)
+   		int bx = blockIdx.x;
+   		int tx = threadIdx.x; 
+		int inner_index = bx * NUMBER_THREADS + tx;
+
+		if(inner_index < bvs_total_size)
+		{
+			for (size_t ii = 0; ii < bvs_sizes(inner_index); ++ii)
+			{
+				for (int d = 0; d < size; ++d)
 				{
-					local_disp[i * size + d] += bs.global[ii].val * displacement(bs.global[ii].index * size + d);
+					local_disp[inner_index * size + d] += bvs_data[ii]->val * displacement(bvs_data[ii]->index * size + d);
 				}
+			}
+		}
+//race_condition
+/*		for (int d = 0; d < size; ++d)
+		{
+			local_disp[inner_index*size + d] += bs_global_val * displacement(bvs_global_index * size + d);
+		}
 */
-//	double lulz =0.0;
-//	res[0] += lulz;
 		return;
 	}
 
@@ -41,8 +53,8 @@ namespace polyfem
 
 		double *local_dispv_dev=NULL;
 
-		int basisvalues_size= vals.basis_values.size();
-		int data_size= basisvalues_size * size() * sizeof(double); 
+		size_t basisvalues_size= vals.basis_values.size();
+		size_t data_size= basisvalues_size * size() * sizeof(double); 
 
 		double *local_dispv = new double[vals.basis_values.size()*size()];
 
@@ -57,24 +69,37 @@ namespace polyfem
 //		Eigen::Matrix<double, Eigen::Dynamic, 1> local_dispv(vals.basis_values.size() * size(), 1);
 //		local_dispv.setZero();
 
-		int size_i = size();
-		double bs_global_val,disp_val;
+		const Local2Global *bs_global;
 
-		for (size_t i = 0; i < vals.basis_values.size(); ++i)
+		const AssemblyValues *bs_storage = vals.basis_values.data();
+		const Local2Global **bs_global_data = NULL;
+		Eigen::Matrix<size_t, Eigen::Dynamic,1> bs_global_sizes(basisvalues_size,1);
+		//int *bs_global_sizes = new int[basisvalues_size];
+
+		for (size_t i = 0; i < basisvalues_size; ++i)
+		{
+			bs_global_data[i] = bs_storage[i].global.data();
+			bs_global_sizes(i,1) = bs_storage[i].global.size();
+		}	
+
+		size_t grid_x = (basisvalues_size%NUMBER_THREADS==0) ? basisvalues_size/NUMBER_THREADS : basisvalues_size/NUMBER_THREADS +1;
+
+		set_dispv<<<grid_x,NUMBER_THREADS>>>(bs_global_data, bs_global_sizes, displacement, size(), basisvalues_size, local_dispv_dev);
+
+/*
+		for (size_t i = 0; i < basisvalues_size; ++i)
 		{
 			const auto &bs = vals.basis_values[i];
 			for (size_t ii = 0; ii < bs.global.size(); ++ii)
 			{
 				for (int d = 0; d < size(); ++d)
 				{
-					bs_global_val = bs.global[ii].val;
-					disp_val =displacement(bs.global[ii].index * size() + d);
-					set_dispv<<<1,1>>>(0,bs_global_val,disp_val,local_dispv_dev);
-	//				local_dispv(i * size() + d) += bs.global[ii].val * displacement(bs.global[ii].index * size() + d);
+					local_dispv(i * size() + d) += bs.global[ii].val * displacement(bs.global[ii].index * size() + d);
 				}
 			}
-		}
 
+		}
+*/
 	    if(cudaMemcpy(local_dispv,local_dispv_dev,data_size,cudaMemcpyDeviceToHost) != cudaSuccess)
 	    {
 		      printf("Error copying to CPU\n");
@@ -90,7 +115,7 @@ namespace polyfem
 
 		const AutoDiffAllocator<double> allocate_auto_diff_scalar;
 
-		for (long i = 0; i < basisvalues_size*size(); ++i)
+		for (size_t i = 0; i < basisvalues_size*size(); ++i)
 		{
 			local_disp(i) = allocate_auto_diff_scalar(i, local_dispv[i]);
 		}

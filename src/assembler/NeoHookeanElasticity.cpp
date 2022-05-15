@@ -280,6 +280,7 @@ namespace polyfem
 		}
 	}
 
+/*
 	double NeoHookeanElasticity::compute_energy(const ElementAssemblyValues &vals, const Eigen::MatrixXd &displacement, const QuadratureVector &da) const
 	{
 		return compute_energy_aux<double>(vals, displacement, da);
@@ -362,7 +363,7 @@ namespace polyfem
 		}
 		return energy;
 	}
-
+*/
 	template <int dim>
 	Eigen::Matrix<double, dim, dim> hat(const Eigen::Matrix<double, dim, 1> &x)
 	{

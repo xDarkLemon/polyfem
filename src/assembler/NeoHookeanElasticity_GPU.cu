@@ -12,7 +12,8 @@
 namespace polyfem
 {
 
-	__global__ void set_dispv(const Local2Global **bvs_data, Eigen::Matrix<size_t, Eigen::Dynamic,1> &bvs_sizes , const Eigen::MatrixXd &displacement , int size,int bvs_total_size, double* local_disp)
+//	__global__ void set_dispv(const Local2Global **bvs_data, Eigen::Matrix<size_t, Eigen::Dynamic,1> &bvs_sizes , const Eigen::MatrixXd &displacement , int size,int bvs_total_size, double* local_disp)
+	__global__ void set_dispv(Eigen::Matrix<const Local2Global*, Eigen::Dynamic,1> &bvs_data, Eigen::Matrix<size_t, Eigen::Dynamic,1> &bvs_sizes , const Eigen::MatrixXd &displacement , int size,int bvs_total_size, double* local_disp)
 	{
    		int bx = blockIdx.x;
    		int tx = threadIdx.x; 
@@ -20,14 +21,15 @@ namespace polyfem
 
 		if(inner_index < bvs_total_size)
 		{
-			for (size_t ii = 0; ii < bvs_sizes(inner_index); ++ii)
+			for (size_t ii = 0; ii < bvs_sizes(inner_index,1); ++ii)
 			{
 				for (int d = 0; d < size; ++d)
 				{
-					local_disp[inner_index * size + d] += bvs_data[ii]->val * displacement(bvs_data[ii]->index * size + d);
+					local_disp[inner_index * size + d] += bvs_data(ii,1)->val * displacement(bvs_data(ii,1)->index * size + d);
 				}
 			}
 		}
+
 //race_condition
 /*		for (int d = 0; d < size; ++d)
 		{
@@ -37,18 +39,19 @@ namespace polyfem
 		return;
 	}
 
-	double NeoHookeanElasticity::compute_energy_gpu(const ElementAssemblyValues &vals, const Eigen::MatrixXd &displacement, const QuadratureVector &da) 
+	double NeoHookeanElasticity::compute_energy(const ElementAssemblyValues &vals, const Eigen::MatrixXd &displacement, const QuadratureVector &da) const 
 	{
-		return compute_energy_aux_gpu(vals, displacement, da);
+		return compute_energy_aux<double>(vals, displacement, da);
 	}
 
 	// Compute ∫ ½μ (tr(FᵀF) - 3 - 2ln(J)) + ½λ ln²(J) du
-
-	double NeoHookeanElasticity::compute_energy_aux_gpu(const ElementAssemblyValues &vals, const Eigen::MatrixXd &displacement, const QuadratureVector &da) 
+	template <typename T>
+	T NeoHookeanElasticity::compute_energy_aux(const ElementAssemblyValues &vals, const Eigen::MatrixXd &displacement, const QuadratureVector &da) const
 	{
-		typedef Eigen::Matrix<double, Eigen::Dynamic, 1> AutoDiffVect;
-		typedef Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, 0, 3, 3> AutoDiffGradMat;
+		typedef Eigen::Matrix<T, Eigen::Dynamic, 1> AutoDiffVect;
+		typedef Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic, 0, 3, 3> AutoDiffGradMat;
 
+//	    printf("Starting..\n");
 		assert(displacement.cols() == 1);
 
 		double *local_dispv_dev=NULL;
@@ -63,7 +66,7 @@ namespace polyfem
 	      printf("Error allocating to GPU\n");
 	      abort();
 		}
-
+		cudaDeviceSynchronize();
 		const int n_pts = da.size();
 
 //		Eigen::Matrix<double, Eigen::Dynamic, 1> local_dispv(vals.basis_values.size() * size(), 1);
@@ -72,13 +75,16 @@ namespace polyfem
 		const Local2Global *bs_global;
 
 		const AssemblyValues *bs_storage = vals.basis_values.data();
-		const Local2Global **bs_global_data = NULL;
+		//const Local2Global **bs_global_data = NULL;
+
+		Eigen::Matrix<const Local2Global* , Eigen::Dynamic,1> bs_global_data(basisvalues_size,1);
 		Eigen::Matrix<size_t, Eigen::Dynamic,1> bs_global_sizes(basisvalues_size,1);
 		//int *bs_global_sizes = new int[basisvalues_size];
 
 		for (size_t i = 0; i < basisvalues_size; ++i)
 		{
-			bs_global_data[i] = bs_storage[i].global.data();
+			//bs_global_data[i] = bs_storage[i].global.data();
+			bs_global_data(i,1) = bs_storage[i].global.data();
 			bs_global_sizes(i,1) = bs_storage[i].global.size();
 		}	
 
@@ -86,6 +92,7 @@ namespace polyfem
 
 		set_dispv<<<grid_x,NUMBER_THREADS>>>(bs_global_data, bs_global_sizes, displacement, size(), basisvalues_size, local_dispv_dev);
 
+		cudaDeviceSynchronize();
 /*
 		for (size_t i = 0; i < basisvalues_size; ++i)
 		{
@@ -105,15 +112,16 @@ namespace polyfem
 		      printf("Error copying to CPU\n");
 		      abort(); 
 	    }
+		
 
 		DiffScalarBase::setVariableCount(basisvalues_size*size());
 		AutoDiffVect local_disp(basisvalues_size*size(), 1);
 
 //		DiffScalarBase::setVariableCount(local_dispv.rows());
 //		AutoDiffVect local_disp(local_dispv.rows(), 1);
-		double energy = double(0.0);
+		T energy = T(0.0);
 
-		const AutoDiffAllocator<double> allocate_auto_diff_scalar;
+		const AutoDiffAllocator<T> allocate_auto_diff_scalar;
 
 		for (size_t i = 0; i < basisvalues_size*size(); ++i)
 		{
@@ -125,7 +133,7 @@ namespace polyfem
 		for (long p = 0; p < n_pts; ++p)
 		{
 			for (long k = 0; k < def_grad.size(); ++k)
-				def_grad(k) = double(0);
+				def_grad(k) = T(0);
 
 			for (size_t i = 0; i < vals.basis_values.size(); ++i)
 			{
@@ -144,21 +152,23 @@ namespace polyfem
 
 			AutoDiffGradMat jac_it(size(), size());
 			for (long k = 0; k < jac_it.size(); ++k)
-				jac_it(k) = double(vals.jac_it[p](k));
+				jac_it(k) = T(vals.jac_it[p](k));
 			def_grad = def_grad * jac_it;
 
 			//Id + grad d
 			for (int d = 0; d < size(); ++d)
-				def_grad(d, d) += double(1);
+				def_grad(d, d) += T(1);
 
 			double lambda, mu;
 			params_.lambda_mu(vals.quadrature.points.row(p), vals.val.row(p), vals.element_id, lambda, mu);
 
-			const double log_det_j = log(polyfem::determinant(def_grad));
-			const double val = mu / 2 * ((def_grad.transpose() * def_grad).trace() - size() - 2 * log_det_j) + lambda / 2 * log_det_j * log_det_j;
+			const T log_det_j = log(polyfem::determinant(def_grad));
+			const T val = mu / 2 * ((def_grad.transpose() * def_grad).trace() - size() - 2 * log_det_j) + lambda / 2 * log_det_j * log_det_j;
 
 			energy += val * da(p);
 		}
+		free(local_dispv);
+		cudaFree(local_dispv_dev);
 		return energy;
 	}
 

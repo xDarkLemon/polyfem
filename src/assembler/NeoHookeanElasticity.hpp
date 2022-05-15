@@ -25,7 +25,7 @@ namespace polyfem
 
 		double compute_energy(const ElementAssemblyValues &vals, const Eigen::MatrixXd &displacement, const QuadratureVector &da) const;
 
-		double compute_energy_gpu(const ElementAssemblyValues &vals, const Eigen::MatrixXd &displacement, const QuadratureVector &da);
+//		double compute_energy_gpu(const ElementAssemblyValues &vals, const Eigen::MatrixXd &displacement, const QuadratureVector &da) const;
 
 		//rhs for fabbricated solution, compute with automatic sympy code
 		Eigen::Matrix<double, Eigen::Dynamic, 1, 0, 3, 1>
@@ -55,7 +55,7 @@ namespace polyfem
 		template <typename T>
 		T compute_energy_aux(const ElementAssemblyValues &vals, const Eigen::MatrixXd &displacement, const QuadratureVector &da) const;
 
-		double compute_energy_aux_gpu(const ElementAssemblyValues &vals, const Eigen::MatrixXd &displacement, const QuadratureVector &da);
+//		double compute_energy_aux(const ElementAssemblyValues &vals, const Eigen::MatrixXd &displacement, const QuadratureVector &da) const;
 
 		template <int n_basis, int dim>
 		void compute_energy_hessian_aux_fast(const ElementAssemblyValues &vals, const Eigen::MatrixXd &displacement, const QuadratureVector &da, Eigen::MatrixXd &H) const;

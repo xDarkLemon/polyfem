@@ -58,7 +58,6 @@ catch_discover_tests(unit_tests)
 # CUDA
 ################################################################################
 
-if(IPC_TOOLKIT_WITH_CUDA)
   include(CheckLanguage)
   check_language(CUDA)
   if(CMAKE_CUDA_COMPILER)
@@ -72,4 +71,3 @@ if(IPC_TOOLKIT_WITH_CUDA)
   # Nvidia RTX8000 -> compute_75
   # Nvidia 3080Ti -> compute_86
   set_target_properties(unit_tests PROPERTIES CUDA_ARCHITECTURES "70;75;86")
-endif()

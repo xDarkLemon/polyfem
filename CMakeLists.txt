@@ -363,8 +363,8 @@ endif()
   # Nvidia 1080/1080Ti -> compute_61
   # Nvidia 3080Ti -> compute_86
   if(NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
-    set(CMAKE_CUDA_ARCHITECTURES 70 75 86)
+    set(CMAKE_CUDA_ARCHITECTURES 60 70 75 86)
   endif()
-  set_target_properties(polyfem PROPERTIES CUDA_ARCHITECTURES "70;75;86")
-  set_target_properties(PolyFEM_bin PROPERTIES CUDA_ARCHITECTURES "70;75;86")
+  set_target_properties(polyfem PROPERTIES CUDA_ARCHITECTURES "60;70;75;86")
+  set_target_properties(PolyFEM_bin PROPERTIES CUDA_ARCHITECTURES "60;70;75;86")
   # endif()

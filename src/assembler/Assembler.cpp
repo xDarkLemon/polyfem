@@ -622,11 +622,10 @@ namespace polyfem
 	{
 		auto storage = create_thread_storage(LocalThreadScalarStorage());
 		const int n_bases = int(bases.size());
-
+// This shoud be a kernel CUDA
 		maybe_parallel_for(n_bases, [&](int start, int end, int thread_id) {
 			LocalThreadScalarStorage &local_storage = get_local_thread_storage(storage, thread_id);
 			ElementAssemblyValues &vals = local_storage.vals;
-
 			for (int e = start; e < end; ++e)
 			{
 				cache.compute(e, is_volume, bases[e], gbases[e], vals);
@@ -635,8 +634,9 @@ namespace polyfem
 
 				assert(MAX_QUAD_POINTS == -1 || quadrature.weights.size() < MAX_QUAD_POINTS);
 				local_storage.da = vals.det.array() * quadrature.weights.array();
-
+				
 				const double val = local_assembler_.compute_energy(vals, displacement, local_storage.da);
+//				const double val = local_assembler_.compute_energy_gpu(vals, displacement, local_storage.da);
 				local_storage.val += val;
 			}
 		});

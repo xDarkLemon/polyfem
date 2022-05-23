@@ -1,5 +1,5 @@
 #include <polyfem/NeoHookeanElasticity.hpp>
-
+#include <stdio.h>
 #include <cuda.h>
 #include <cuda_runtime.h>
 #define NUMBER_THREADS  32
@@ -12,20 +12,38 @@
 namespace polyfem
 {
 
-//	__global__ void set_dispv(const Local2Global **bvs_data, Eigen::Matrix<size_t, Eigen::Dynamic,1> &bvs_sizes , const Eigen::MatrixXd &displacement , int size,int bvs_total_size, double* local_disp)
-	__global__ void set_dispv(Eigen::Matrix<const Local2Global*, Eigen::Dynamic,1> &bvs_data, Eigen::Matrix<size_t, Eigen::Dynamic,1> &bvs_sizes , const Eigen::MatrixXd &displacement , int size,int bvs_total_size, double* local_disp)
+	__global__ void set_dispv(Local2Global* bvs_data, int* bvs_sizes , double* displacement_dev , int size, int bvs_total_size, double* local_disp)
 	{
    		int bx = blockIdx.x;
    		int tx = threadIdx.x; 
 		int inner_index = bx * NUMBER_THREADS + tx;
-
+		double result=0.0;
+/*
 		if(inner_index < bvs_total_size)
 		{
 			for (size_t ii = 0; ii < bvs_sizes(inner_index,1); ++ii)
 			{
 				for (int d = 0; d < size; ++d)
 				{
-					local_disp[inner_index * size + d] += bvs_data(ii,1)->val * displacement(bvs_data(ii,1)->index * size + d);
+			//		result= bvs_data(ii,1)->val * displacement(bvs_data(ii,1)->index * size + d);
+					result= 0; 
+			//		printf("%lf   ",result);
+					
+					local_disp[inner_index * size + d] += result; 
+				}
+			}
+		}
+
+*/
+
+	if(inner_index < bvs_total_size)
+		{
+			for (size_t ii = 0; ii < bvs_sizes[inner_index]; ++ii)
+			{
+				for (int d = 0; d < size; ++d)
+				{
+					result= bvs_data[inner_index + ii*bvs_total_size].val * displacement_dev[bvs_data[inner_index+ ii*bvs_total_size].index * size + d];
+					local_disp[inner_index * size + d] += result; 
 				}
 			}
 		}
@@ -39,6 +57,7 @@ namespace polyfem
 		return;
 	}
 
+
 	double NeoHookeanElasticity::compute_energy(const ElementAssemblyValues &vals, const Eigen::MatrixXd &displacement, const QuadratureVector &da) const 
 	{
 		return compute_energy_aux<double>(vals, displacement, da);
@@ -51,21 +70,51 @@ namespace polyfem
 		typedef Eigen::Matrix<T, Eigen::Dynamic, 1> AutoDiffVect;
 		typedef Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic, 0, 3, 3> AutoDiffGradMat;
 
-//	    printf("Starting..\n");
 		assert(displacement.cols() == 1);
 
 		double *local_dispv_dev=NULL;
+		double *displacement_dev = NULL; 
+		int *bs_global_sizes_dev = NULL;
 
 		size_t basisvalues_size= vals.basis_values.size();
-		size_t data_size= basisvalues_size * size() * sizeof(double); 
+
+
+		int localdispv_data_size= basisvalues_size * size() * sizeof(double); 
+		int displ_data_size = displacement.rows()*displacement.cols()*sizeof(double);
+		int bsglobalsizes_data_size = basisvalues_size  * sizeof(int); 
 
 		double *local_dispv = new double[vals.basis_values.size()*size()];
 
-		if (cudaMalloc((void **)&local_dispv_dev , data_size) != cudaSuccess)
+		if (cudaMalloc((void **)&local_dispv_dev , localdispv_data_size) != cudaSuccess)
  		{
 	      printf("Error allocating to GPU\n");
 	      abort();
 		}
+
+		cudaDeviceSynchronize();
+
+		if (cudaMalloc((void **)&displacement_dev , displ_data_size) != cudaSuccess)
+ 		{
+	      printf("Error allocating to GPU\n");
+	      abort();
+		}
+
+		cudaDeviceSynchronize();
+
+		if (cudaMalloc((void **)&bs_global_sizes_dev , bsglobalsizes_data_size) != cudaSuccess)
+ 		{
+	      printf("Error allocating to GPU\n");
+	      abort();
+		}
+
+		cudaDeviceSynchronize();
+
+	    if(cudaMemcpy(displacement_dev,displacement.data(),displ_data_size,cudaMemcpyHostToDevice) != cudaSuccess)
+	    {
+		      printf("Error copying to GPU\n");
+		      abort(); 
+	    }
+
 		cudaDeviceSynchronize();
 		const int n_pts = da.size();
 
@@ -77,20 +126,53 @@ namespace polyfem
 		const AssemblyValues *bs_storage = vals.basis_values.data();
 		//const Local2Global **bs_global_data = NULL;
 
-		Eigen::Matrix<const Local2Global* , Eigen::Dynamic,1> bs_global_data(basisvalues_size,1);
-		Eigen::Matrix<size_t, Eigen::Dynamic,1> bs_global_sizes(basisvalues_size,1);
+		int bs_global_columns = bs_storage[0].global.size();
+		Eigen::Matrix<Local2Global, Eigen::Dynamic,1> bs_global_data(basisvalues_size,bs_global_columns);
+		Eigen::Matrix<int, Eigen::Dynamic,1> bs_global_sizes(basisvalues_size,1);
 		//int *bs_global_sizes = new int[basisvalues_size];
+
+		Local2Global* bs_global_data_dev = NULL;
+		int bsglobaldata_data_size = basisvalues_size  * bs_global_columns* sizeof(Local2Global); 
+
+
+		if (cudaMalloc((void **)&bs_global_data_dev , bsglobaldata_data_size) != cudaSuccess)
+ 		{
+	      printf("Error allocating to GPU\n");
+	      abort();
+		}
+
+		cudaDeviceSynchronize();
 
 		for (size_t i = 0; i < basisvalues_size; ++i)
 		{
 			//bs_global_data[i] = bs_storage[i].global.data();
-			bs_global_data(i,1) = bs_storage[i].global.data();
+	//		bs_global_data(i,1) = bs_storage[i].global;
 			bs_global_sizes(i,1) = bs_storage[i].global.size();
+//			printf("\n%d", bs_storage[i].global.size());
+			for(int ii=0 ; ii<bs_global_columns;++ii){
+				bs_global_data(i,ii) = bs_storage[i].global[ii];
+			}
 		}	
 
-		size_t grid_x = (basisvalues_size%NUMBER_THREADS==0) ? basisvalues_size/NUMBER_THREADS : basisvalues_size/NUMBER_THREADS +1;
+		if(cudaMemcpy(bs_global_sizes_dev,bs_global_sizes.data(),bsglobalsizes_data_size,cudaMemcpyHostToDevice) != cudaSuccess)
+	    {
+		      printf("Error copying to GPU\n");
+		      abort(); 
+	    }
 
-		set_dispv<<<grid_x,NUMBER_THREADS>>>(bs_global_data, bs_global_sizes, displacement, size(), basisvalues_size, local_dispv_dev);
+		cudaDeviceSynchronize();
+		
+		if(cudaMemcpy(bs_global_data_dev,bs_global_data.data(),bsglobaldata_data_size,cudaMemcpyHostToDevice) != cudaSuccess)
+	    {
+		      printf("Error copying to GPU\n");
+		      abort(); 
+	    }
+
+		cudaDeviceSynchronize();
+
+		size_t grid_x = (basisvalues_size%NUMBER_THREADS==0) ? basisvalues_size/NUMBER_THREADS : basisvalues_size/NUMBER_THREADS +1;
+		set_dispv<<<grid_x,NUMBER_THREADS>>>(bs_global_data_dev, bs_global_sizes_dev, displacement_dev, size(), basisvalues_size, local_dispv_dev);
+
 
 		cudaDeviceSynchronize();
 /*
@@ -107,12 +189,21 @@ namespace polyfem
 
 		}
 */
-	    if(cudaMemcpy(local_dispv,local_dispv_dev,data_size,cudaMemcpyDeviceToHost) != cudaSuccess)
+		
+	    if(cudaMemcpy(local_dispv,local_dispv_dev,localdispv_data_size,cudaMemcpyDeviceToHost) != cudaSuccess)
 	    {
 		      printf("Error copying to CPU\n");
 		      abort(); 
 	    }
-		
+
+
+		cudaDeviceSynchronize();
+		for (size_t i = 0; i < vals.basis_values.size()*size(); ++i)
+		{
+	//		printf("%lf   ",local_dispv[i]);
+		}	
+
+//			printf("\n\n");
 
 		DiffScalarBase::setVariableCount(basisvalues_size*size());
 		AutoDiffVect local_disp(basisvalues_size*size(), 1);
@@ -167,8 +258,12 @@ namespace polyfem
 
 			energy += val * da(p);
 		}
+
 		free(local_dispv);
 		cudaFree(local_dispv_dev);
+		cudaFree(displacement_dev);
+		cudaFree(bs_global_sizes_dev);
+		cudaFree(bs_global_data_dev);
 		return energy;
 	}
 

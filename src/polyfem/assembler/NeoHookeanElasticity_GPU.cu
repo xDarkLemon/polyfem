@@ -1,5 +1,5 @@
 #include "NeoHookeanElasticity.hpp"
-#include <assembler/utils/CUDA_utilities.hpp>
+#include <assembler/utils/CUDA_utilities.cuh>
 #include <polyfem/basis/Basis.hpp>
 #include <polyfem/autogen/auto_elasticity_rhs.hpp>
 

@@ -636,7 +636,6 @@ namespace polyfem
 				local_storage.da = vals.det.array() * quadrature.weights.array();
 				
 				const double val = local_assembler_.compute_energy(vals, displacement, local_storage.da);
-//				const double val = local_assembler_.compute_energy_gpu(vals, displacement, local_storage.da);
 				local_storage.val += val;
 			}
 		});

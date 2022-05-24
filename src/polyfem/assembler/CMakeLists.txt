@@ -1,5 +1,6 @@
 set(SOURCES
 	Assembler.cpp
+	Assembler.cu
 	Assembler.hpp
 	Bilaplacian.cpp
 	Bilaplacian.hpp

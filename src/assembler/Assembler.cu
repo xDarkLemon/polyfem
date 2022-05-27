@@ -66,12 +66,19 @@ namespace polyfem
 
 			assert(MAX_QUAD_POINTS == -1 || quadrature.weights.size() < MAX_QUAD_POINTS);
 			storage.da = vals.det.array() * quadrature.weights.array();
+			const double val = local_assembler_.compute_energy(vals, displacement, storage.da);
+			storage.val += val;
+
 		}
 
+//		double res = 0;
+		// Serially merge local storages
+//		for (const LocalThreadScalarStorage &local_storage : storage)
+//			res += local_storage.val;
+		return storage.val;
+/*
 		int sumarray_data_size = grid_x * sizeof(double); 
 		double *result = new double[sumarray_data_size];
-//		const double val = local_assembler_.compute_energy(vals, displacement, storage.da);
-//		storage.val += val;
 		result_dev = ALLOCATE_GPU<double>(result_dev,sumarray_data_size);
 		compute_energy_GPU<LocalAssembler><<<grid_x,NUMBER_THREADS>>>(vals, displacement, storage.da, n_bases, result_dev, local_assembler_);
 		COPYDATATOHOST<double>(result,result_dev,sumarray_data_size);
@@ -79,6 +86,7 @@ namespace polyfem
 		double test_return = result[0];
 		free(result);
 		return test_return;
+*/
 	}
 
 	//template instantiation

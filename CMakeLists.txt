@@ -219,7 +219,6 @@ target_link_libraries(polyfem PUBLIC tinyexpr::tinyexpr)
 include(tinyxml)
 target_link_libraries(polyfem PUBLIC tinyxml2)
 
-
 if(POLYFEM_WITH_REMESHING)
     # wmtk library
     include(wmtk)
@@ -233,6 +232,11 @@ target_link_libraries(polyfem PUBLIC hdf5::hdf5)
 
 include(high_five)
 target_link_libraries(polyfem PUBLIC HighFive::HighFive)
+
+# Thrust
+include(thrust)  
+target_link_libraries(polyfem PUBLIC Thrust::Thrust)
+
 
 ################################################################################
 # Optional libraries
@@ -337,8 +341,7 @@ endif()
 
 # if(1)
   # Thrust library 
-  #find_package(Thrust REQUIRED CONFIG)
-  #thrust_create_target(Thrust)
+
   #target_include_directories(polyfem PUBLIC ${Thrust_INCLUDE_DIRS})
   #target_link_libraries(polyfem PUBLIC Thrust)
 

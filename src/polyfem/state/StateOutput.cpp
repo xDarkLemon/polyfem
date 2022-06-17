@@ -1736,10 +1736,12 @@ namespace polyfem
 						: displaced_surface;
 
 				ipc::FrictionConstraints friction_constraint_set;
-				ipc::construct_friction_constraint_set(
-					collision_mesh, displaced_surface, constraint_set,
-					args["contact"]["dhat"], barrier_stiffness, args["contact"]["friction_coefficient"],
-					friction_constraint_set);
+
+				// TO DO: SET A DUMMY PARAMETER
+				//ipc::construct_friction_constraint_set(
+				//	collision_mesh, displaced_surface, constraint_set,
+				//	args["contact"]["dhat"], barrier_stiffness, args["contact"]["friction_coefficient"],
+				//	friction_constraint_set);
 
 				double dt = 1;
 				if (!args["time"].is_null())

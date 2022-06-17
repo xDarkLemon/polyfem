@@ -33,6 +33,21 @@ namespace polyfem
 			}
 		}
 
+		template <typename T>
+		__global__ void defgrad_comp(Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic, 0, 3, 3> *def_grad, Eigen::Matrix<double, Eigen::Dynamic, 1, 0, 3, 1> *grad, double *local_dispv, int size, int i)
+		{
+			int bx = blockIdx.x;
+			int by = blockIdx.y;
+			int tx = threadIdx.x;
+			int ty = threadIdx.y;
+			int inner_index_x = bx * NUMBER_THREADS + tx;
+			int inner_index_y = by * NUMBER_THREADS + ty;
+			if (inner_index_x < size && inner_index_y < size)
+			{
+				def_grad[0](inner_index_x, inner_index_y) += grad[0](inner_index_y) * local_dispv[i * size + inner_index_x];
+			}
+		}
+
 		double NeoHookeanElasticity::compute_energy_GPU(const ElementAssemblyValues &vals, const Eigen::MatrixXd &displacement, const QuadratureVector &da) const
 		{
 			return compute_energy_aux<double>(vals, displacement, da);
@@ -71,13 +86,7 @@ namespace polyfem
 
 			const int n_pts = da.size();
 
-			//		Eigen::Matrix<double, Eigen::Dynamic, 1> local_dispv(vals.basis_values.size() * size(), 1);
-			//		local_dispv.setZero();
-
-			// const Local2Global *bs_global;
-
 			const AssemblyValues *bs_storage = vals.basis_values.data();
-			//const Local2Global **bs_global_data = NULL;
 
 			int bs_global_columns = bs_storage[0].global.size();
 			Eigen::Matrix<Local2Global, Eigen::Dynamic, 1> bs_global_data(basisvalues_size, bs_global_columns);
@@ -110,50 +119,41 @@ namespace polyfem
 
 				cudaDeviceSynchronize();
 
-				cudaDeviceSynchronize();
-				/*
-						for (size_t i = 0; i < basisvalues_size; ++i)
-						{
-							const auto &bs = vals.basis_values[i];
-							for (size_t ii = 0; ii < bs.global.size(); ++ii)
-							{
-								const auto &bs = vals.basis_values[i];
-								for (size_t ii = 0; ii < bs.global.size(); ++ii)
-								{
-									for (int d = 0; d < size(); ++d)
-									{
-										const auto &bs = vals.basis_values[i];
-										for (size_t ii = 0; ii < bs.global.size(); ++ii)
-										{
-											for (int d = 0; d < size(); ++d)
-											{
-												local_dispv(i * size() + d) += bs.global[ii].val * displacement(bs.global[ii].index * size() + d);
-											}
-										}
-
-								}
-						*/
 				COPYDATATOHOST<double>(local_dispv, local_dispv_dev, localdispv_data_size);
 				cudaDeviceSynchronize();
-
-				for (size_t i = 0; i < vals.basis_values.size() * size(); ++i)
-				{
-					//		printf("%lf   ",local_dispv[i]);
-				}
 
 				DiffScalarBase::setVariableCount(basisvalues_size * size());
 				AutoDiffVect local_disp(basisvalues_size * size(), 1);
 
-				T energy = T(0.0);
+				Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic, 0, 3, 3> def_grad(size(), size());
+				int def_grad_size = sizeof(def_grad);
+				Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic, 0, 3, 3> *def_grad_dev = NULL;
 
-				const AutoDiffAllocator<T> allocate_auto_diff_scalar;
+				def_grad_dev = ALLOCATE_GPU<Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic, 0, 3, 3>>(def_grad_dev, def_grad_size);
 
-				for (size_t i = 0; i < basisvalues_size * size(); ++i)
+				Eigen::Matrix<double, Eigen::Dynamic, 1, 0, 3, 1> grad;
+				Eigen::Matrix<double, Eigen::Dynamic, 1, 0, 3, 1> *grad_dev;
+				int grad_size = sizeof(grad);
+				grad_dev = ALLOCATE_GPU<Eigen::Matrix<double, Eigen::Dynamic, 1, 0, 3, 1>>(grad_dev, grad_size);
+
+				COPYDATATOGPU<Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic, 0, 3, 3>>(def_grad_dev, &def_grad, def_grad_size);
+				for (size_t i = 0; i < vals.basis_values.size(); ++i)
 				{
-					local_disp(i) = allocate_auto_diff_scalar(i, local_dispv[i]);
+					const auto &bs = vals.basis_values[i];
+					assert(grad.size() == size());
+
+					COPYDATATOGPU<Eigen::Matrix<double, Eigen::Dynamic, 1, 0, 3, 1>>(grad_dev, &grad, grad_size);
+
+					dim3 threads_per_block(NUMBER_THREADS, NUMBER_THREADS);
+					defgrad_comp<T><<<1, threads_per_block>>>(def_grad_dev, grad_dev, local_dispv_dev, size(), i);
+
+					cudaDeviceSynchronize();
 				}
 
-				AutoDiffGradMat def_grad(size(), size());
+				COPYDATATOHOST<Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic, 0, 3, 3>>(&def_grad, def_grad_dev, def_grad_size);
+
+				cudaDeviceSynchronize();
+				T energy = 0.0;
 
 				for (long p = 0; p < n_pts; ++p)
 				{
@@ -174,11 +174,12 @@ namespace polyfem
 							}
 						}
 					}
-
 					AutoDiffGradMat jac_it(size(), size());
 					for (long k = 0; k < jac_it.size(); ++k)
 						jac_it(k) = T(vals.jac_it[p](k));
 					def_grad = def_grad * jac_it;
+
+					//			COPYDATATOGPU<Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic, 0, 3, 3>>(jac_it_dev,&jac_it, jac_it_size);
 
 					//Id + grad d
 					for (int d = 0; d < size(); ++d)
@@ -193,8 +194,10 @@ namespace polyfem
 					energy += val * da(p);
 				}
 
-				free(local_dispv);
+				delete[] local_dispv;
 				cudaFree(local_dispv_dev);
+				cudaFree(def_grad_dev);
+				cudaFree(grad_dev);
 				cudaFree(displacement_dev);
 				cudaFree(bs_global_sizes_dev);
 				cudaFree(bs_global_data_dev);

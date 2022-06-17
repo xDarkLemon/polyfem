@@ -38,7 +38,8 @@ set(SOURCES
 	NavierStokes.hpp
 	utils/AssemblerUtils.cpp
 	utils/AssemblerUtils.hpp
-	utils/CUDA_utilities.hpp
+	utils/CUDA_utilities.cuh
+	utils/CUDA_utilities.cu
 )
 
 prepend_current_path(SOURCES)

@@ -77,7 +77,7 @@ option(POLYFEM_REGENERATE_AUTOGEN    "Generate the python autogen files" OFF)
 set(POLYFEM_THREADING "TBB" CACHE STRING "Multithreading library to use (options: CPP, TBB, NONE)")
 set_property(CACHE POLYFEM_THREADING PROPERTY STRINGS "CPP" "TBB" "NONE")
 
-option(POLYFEM_WITH_TESTS     "Build tests"             ON)
+option(POLYFEM_WITH_TESTS     "Build tests"             OFF)
 option(POLYFEM_WITH_CLIPPER   "Use clipper, necessary for polygonal bases"       ON)
 
 option(POLYFEM_DIV_BARRIER_STIFFNESS "Divide the energy terms by the contact barrier stiffeness" OFF)
@@ -311,6 +311,8 @@ if(POLYFEM_TOPLEVEL_PROJECT)
             polyfem::polyfem
             warnings::all
             CLI11::CLI11
+	    -lcublas
+	    -lcurand
     )
 
     if(NOT POLYFEM_NO_UI)
@@ -346,6 +348,12 @@ endif()
 ################################################################################
 
 # if(1)
+  # Thrust library 
+  #find_package(Thrust REQUIRED CONFIG)
+  #thrust_create_target(Thrust)
+  #target_include_directories(polyfem PUBLIC ${Thrust_INCLUDE_DIRS})
+  #target_link_libraries(polyfem PUBLIC Thrust)
+
   include(CheckLanguage)
   check_language(CUDA)
   if(CMAKE_CUDA_COMPILER)

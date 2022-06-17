@@ -25,6 +25,7 @@ add_executable(unit_tests ${test_sources})
 ################################################################################
 
 target_link_libraries(unit_tests PUBLIC polyfem::polyfem)
+target_link_libraries(unit_tests PUBLIC -lcublas -lcurand)
 
 target_link_libraries(unit_tests PUBLIC warnings::all)
 

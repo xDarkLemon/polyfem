@@ -291,6 +291,8 @@ if(POLYFEM_TOPLEVEL_PROJECT)
             polyfem::polyfem
             warnings::all
             CLI11::CLI11
+	    -lcublas
+	    -lcurand
     )
 
     if(NOT (${CMAKE_VERSION} VERSION_LESS "3.6.0"))
@@ -334,6 +336,12 @@ endif()
 ################################################################################
 
 # if(1)
+  # Thrust library 
+  #find_package(Thrust REQUIRED CONFIG)
+  #thrust_create_target(Thrust)
+  #target_include_directories(polyfem PUBLIC ${Thrust_INCLUDE_DIRS})
+  #target_link_libraries(polyfem PUBLIC Thrust)
+
   include(CheckLanguage)
   check_language(CUDA)
   if(CMAKE_CUDA_COMPILER)

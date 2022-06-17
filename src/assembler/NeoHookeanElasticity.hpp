@@ -3,6 +3,7 @@
 #include <polyfem/Common.hpp>
 #include <polyfem/ElasticityUtils.hpp>
 
+#include <polyfem/CUDA_utilities.cuh>
 #include <polyfem/ElementAssemblyValues.hpp>
 #include <polyfem/ElementBases.hpp>
 #include <polyfem/AutodiffTypes.hpp>
@@ -45,6 +46,7 @@ namespace polyfem
 		void set_parameters(const json &params);
 		void init_multimaterial(const bool is_volume, const Eigen::MatrixXd &Es, const Eigen::MatrixXd &nus);
 		void set_params(const LameParameters &params) { params_ = params; }
+		void get_lambda_mu(const Eigen::MatrixXd &param, const Eigen::MatrixXd &p, int el_id, double &lambda, double &mu) const;
 
 	private:
 		int size_ = 2;

@@ -1,7 +1,8 @@
 #include <polyfem/Assembler.hpp>
-#include <polyfem/CUDA_utilities.hpp>
+#include <polyfem/CUDA_utilities.cuh>
 #include <polyfem/NeoHookeanElasticity.hpp>
 #include <polyfem/MultiModel.hpp>
+#include "cublas_v2.h"
 // #include <polyfem/OgdenElasticity.hpp>
 
 #include <polyfem/Logger.hpp>
@@ -13,21 +14,6 @@
 
 namespace polyfem
 {
-	namespace
-	{
-		class LocalThreadScalarStorage
-		{
-		public:
-			double val;
-			ElementAssemblyValues vals;
-			QuadratureVector da;
-
-			LocalThreadScalarStorage()
-			{
-				val = 0;
-			}
-		};
-	} // namespace
 
 	template<class LocalAssembler>
 	__global__ void compute_energy_GPU(ElementAssemblyValues &vals, const Eigen::MatrixXd &displacement , QuadratureVector &da, int n_bases,double *result, LocalAssembler gg)
@@ -43,6 +29,7 @@ namespace polyfem
 		return;
 	}
 
+// ITS MUCH BETTER IDEA TO MOVE ALL ENERGY COMP HERE
 
 	template <class LocalAssembler>
 	double NLAssembler<LocalAssembler>::assemble_GPU(
@@ -52,35 +39,74 @@ namespace polyfem
 		const AssemblyValsCache &cache,
 		const Eigen::MatrixXd &displacement) const
 	{
-		auto storage = LocalThreadScalarStorage();
 		const int n_bases = int(bases.size());
 
-		double *result_dev=NULL;
-		size_t grid_x = (n_bases%NUMBER_THREADS==0) ? n_bases/NUMBER_THREADS : n_bases/NUMBER_THREADS +1;
+//		double *result_dev=NULL;
 
-		ElementAssemblyValues &vals = storage.vals;
+//		size_t grid_x = (n_bases%NUMBER_THREADS==0) ? n_bases/NUMBER_THREADS : n_bases/NUMBER_THREADS +1;
+
+		const ElementAssemblyValues* vals_array = cache.access_cache_data();
+//		ElementAssemblyValues vals;
+		auto da_array = new QuadratureVector[n_bases];
+//		QuadratureVector da;
+		double store_val = 0.0;
+
+
+// extract all lambdas and mus
+/*
+		double lambda, mu;
+		const int n_pts = da.size();
+		auto lambda_array = new double[n_pts];
+		auto mu_array = new double[n_pts];
+		for (int p=0; p<n_pts; p++ ){
+			local_assembler_.get_lambda_mu(vals.quadrature.points.row(p), vals.val.row(p),vals.element_id, lambda, mu);
+			lambda_array[p] = lambda;
+			mu_array[p] = mu;
+		}
+*/
+	//	delete [] lambda_array;
+	//	delete [] mu_array;
 		for (int e = 0; e < n_bases; ++e)
 		{
-			cache.compute(e, is_volume, bases[e], gbases[e], vals);
-			const Quadrature &quadrature = vals.quadrature;
-
+			const Quadrature &quadrature = vals_array[e].quadrature;
 			assert(MAX_QUAD_POINTS == -1 || quadrature.weights.size() < MAX_QUAD_POINTS);
-			storage.da = vals.det.array() * quadrature.weights.array();
-			const double val = local_assembler_.compute_energy(vals, displacement, storage.da);
-			storage.val += val;
-
+			da_array[e] = vals_array[e].det.array() * quadrature.weights.array();
 		}
 
-//		double res = 0;
-		// Serially merge local storages
-//		for (const LocalThreadScalarStorage &local_storage : storage)
-//			res += local_storage.val;
-		return storage.val;
+		for (int e = 0; e < n_bases; ++e)
+		{
+			//cache.compute(e, is_volume, bases[e], gbases[e], vals);
+//			const Quadrature &quadrature = vals_array[e].quadrature;
+
+//			assert(MAX_QUAD_POINTS == -1 || quadrature.weights.size() < MAX_QUAD_POINTS);
+			//da = vals_array[e].det.array() * quadrature.weights.array();
+
+			const double val = local_assembler_.compute_energy(vals_array[e], displacement, da_array[e]);
+			store_val += val;
+		}
+/*		
+		int sumarray_data_size = grid_x * sizeof(double); 
+		double *result = new double[sumarray_data_size];
+
+		result_dev = ALLOCATE_GPU<double>(result_dev,sumarray_data_size);
+
+		compute_energy_GPU<LocalAssembler><<<grid_x,NUMBER_THREADS>>>(vals, displacement, da, n_bases, result_dev, local_assembler_);
+		//const double val = local_assembler_.compute_energy(vals, displacement, da);
+		//store_val += val;
+
+		COPYDATATOHOST<double>(result,result_dev,sumarray_data_size);
+		cudaFree(result_dev);
+		double test_return = result[0];
+		free(result);
+		return test_return;
+*/
+
+		return store_val;
+		
 /*
 		int sumarray_data_size = grid_x * sizeof(double); 
 		double *result = new double[sumarray_data_size];
 		result_dev = ALLOCATE_GPU<double>(result_dev,sumarray_data_size);
-		compute_energy_GPU<LocalAssembler><<<grid_x,NUMBER_THREADS>>>(vals, displacement, storage.da, n_bases, result_dev, local_assembler_);
 		COPYDATATOHOST<double>(result,result_dev,sumarray_data_size);
 		cudaFree(result_dev);
 		double test_return = result[0];

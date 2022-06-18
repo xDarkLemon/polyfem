@@ -1739,8 +1739,8 @@ namespace polyfem
 				ipc::construct_friction_constraint_set(
 					collision_mesh, displaced_surface, constraint_set,
 					args["contact"]["dhat"], barrier_stiffness, args["contact"]["friction_coefficient"],
-					friction_constraint_set);
-
+					friction_constraint_set,0);
+					
 				double dt = 1;
 				if (!args["time"].is_null())
 					dt = args["time"]["dt"];

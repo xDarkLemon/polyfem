@@ -190,7 +190,7 @@ namespace polyfem
 			update_constraint_set(displaced_surface);
 			ipc::construct_friction_constraint_set(
 				state.collision_mesh, displaced_surface, _constraint_set,
-				_dhat, _barrier_stiffness, _mu, _friction_constraint_set);
+				_dhat, _barrier_stiffness, _mu, _friction_constraint_set,0);
 		}
 
 		// Save the variables for use in lagged damping

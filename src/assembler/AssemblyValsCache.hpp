@@ -12,6 +12,9 @@ namespace polyfem
 		const ElementAssemblyValues* access_cache_data() const{
 			return cache.data();
 		}
+		const int cache_data_size() const{
+			return int(cache.size());
+		}
 
 		void clear()
 		{

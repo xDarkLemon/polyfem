@@ -33,54 +33,43 @@ namespace polyfem
 
 	template <class LocalAssembler>
 	double NLAssembler<LocalAssembler>::assemble_GPU(
-		const bool is_volume,
-		const std::vector<ElementBases> &bases,
-		const std::vector<ElementBases> &gbases,
+//		const bool is_volume,
+//		const std::vector<ElementBases> &bases,
+//		const std::vector<ElementBases> &gbases,
 		const AssemblyValsCache &cache,
 		const Eigen::MatrixXd &displacement) const
 	{
-		const int n_bases = int(bases.size());
+		const int n_bases = cache.cache_data_size();
 
 //		double *result_dev=NULL;
 
 //		size_t grid_x = (n_bases%NUMBER_THREADS==0) ? n_bases/NUMBER_THREADS : n_bases/NUMBER_THREADS +1;
 
 		const ElementAssemblyValues* vals_array = cache.access_cache_data();
-//		ElementAssemblyValues vals;
 		auto da_array = new QuadratureVector[n_bases];
-//		QuadratureVector da;
 		double store_val = 0.0;
-
-
-// extract all lambdas and mus
-/*
 		double lambda, mu;
-		const int n_pts = da.size();
-		auto lambda_array = new double[n_pts];
-		auto mu_array = new double[n_pts];
+
+		for (int e = 0; e < n_bases; ++e)
+		{
+//			const Quadrature &quadrature = vals_array[e].quadrature;
+			assert(MAX_QUAD_POINTS == -1 || vals_array[e].quadrature.weights.size() < MAX_QUAD_POINTS);
+			da_array[e] = vals_array[e].det.array() * vals_array[e].quadrature.weights.array();
+		}
+
+// extract all lambdas and mus and set to device vector
+/*
+		const int n_pts = da_array[0].size();
+		thrust::device_vector<double> lambda_array(n_pts);
+		thrust::device_vector<double> mu_array(n_pts);
 		for (int p=0; p<n_pts; p++ ){
-			local_assembler_.get_lambda_mu(vals.quadrature.points.row(p), vals.val.row(p),vals.element_id, lambda, mu);
+			local_assembler_.get_lambda_mu(vals_array[0].quadrature.points.row(p), vals_array[0].val.row(p),vals_array[0].element_id, lambda, mu);
 			lambda_array[p] = lambda;
 			mu_array[p] = mu;
 		}
 */
-	//	delete [] lambda_array;
-	//	delete [] mu_array;
 		for (int e = 0; e < n_bases; ++e)
 		{
-			const Quadrature &quadrature = vals_array[e].quadrature;
-			assert(MAX_QUAD_POINTS == -1 || quadrature.weights.size() < MAX_QUAD_POINTS);
-			da_array[e] = vals_array[e].det.array() * quadrature.weights.array();
-		}
-
-		for (int e = 0; e < n_bases; ++e)
-		{
-			//cache.compute(e, is_volume, bases[e], gbases[e], vals);
-//			const Quadrature &quadrature = vals_array[e].quadrature;
-
-//			assert(MAX_QUAD_POINTS == -1 || quadrature.weights.size() < MAX_QUAD_POINTS);
-			//da = vals_array[e].det.array() * quadrature.weights.array();
-
 			const double val = local_assembler_.compute_energy(vals_array[e], displacement, da_array[e]);
 			store_val += val;
 		}
@@ -100,6 +89,7 @@ namespace polyfem
 		free(result);
 		return test_return;
 */
+
 
 		return store_val;
 		

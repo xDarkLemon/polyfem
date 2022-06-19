@@ -26,6 +26,7 @@ set(SOURCES
 	NeoHookeanElasticity_GPU.cu
 	NeoHookeanElasticity.cpp
 	NeoHookeanElasticity.hpp
+
 	# OgdenElasticity.cpp
 	# OgdenElasticity.hpp
 	RhsAssembler.cpp
@@ -43,6 +44,10 @@ set(SOURCES
 	GenericProblem.cpp
 	GenericProblem.hpp
 )
+
+if(WITH_GPU)
+	add_definitions(-DUSE_GPU)
+endif()
 
 prepend_current_path(SOURCES)
 polyfem_set_source_group(${SOURCES})

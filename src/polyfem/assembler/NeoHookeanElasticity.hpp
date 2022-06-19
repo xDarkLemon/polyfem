@@ -3,6 +3,13 @@
 #include <polyfem/Common.hpp>
 #include <polyfem/utils/ElasticityUtils.hpp>
 
+#include <thrust/functional.h>
+#include <thrust/reduce.h>
+#include <thrust/device_vector.h>
+#include <thrust/copy.h>
+#include <thrust/host_vector.h>
+#include <polyfem/assembler/CUDA_utilities.cuh>
+
 #include <polyfem/assembler/ElementAssemblyValues.hpp>
 #include <polyfem/basis/ElementBases.hpp>
 #include <polyfem/utils/AutodiffTypes.hpp>
@@ -26,7 +33,20 @@ namespace polyfem
 			Eigen::VectorXd assemble_grad(const ElementAssemblyValues &vals, const Eigen::MatrixXd &displacement, const QuadratureVector &da) const;
 
 			double compute_energy(const ElementAssemblyValues &vals, const Eigen::MatrixXd &displacement, const QuadratureVector &da) const;
-			double compute_energy_GPU(const ElementAssemblyValues &vals, const Eigen::MatrixXd &displacement, const QuadratureVector &da) const;
+
+			void compute_energy_gpu(double *displacement_dev_ptr,
+									Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, 0, 3, 3> *jac_it_dev_ptr,
+									basis::Local2Global *global_data_dev_ptr,
+									Eigen::Matrix<double, -1, 1, 0, 3, 1> *da_dev_ptr,
+									Eigen::Matrix<double, -1, 1, 0, 3, 1> *grad_dev_ptr,
+									int n_bases,
+									int basis_values_N,
+									int global_columns_N,
+									int n_pts,
+									double lambda,
+									double mu,
+									double *energy_storage) const;
+
 			//rhs for fabbricated solution, compute with automatic sympy code
 			Eigen::Matrix<double, Eigen::Dynamic, 1, 0, 3, 1>
 			compute_rhs(const AutodiffHessianPt &pt) const;
@@ -44,6 +64,7 @@ namespace polyfem
 			//sets material params
 			void add_multimaterial(const int index, const json &params);
 			void set_params(const LameParameters &params) { params_ = params; }
+			void get_lambda_mu(const Eigen::MatrixXd &param, const Eigen::MatrixXd &p, int el_id, double &lambda, double &mu) const;
 
 		private:
 			int size_ = -1;

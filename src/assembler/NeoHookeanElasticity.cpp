@@ -283,7 +283,7 @@ namespace polyfem
 	void NeoHookeanElasticity::get_lambda_mu(const Eigen::MatrixXd &param, const Eigen::MatrixXd &p, int el_id, double &lambda, double &mu) const{
 		params_.lambda_mu(param, p, el_id, lambda, mu);
 	}
-/*
+
 	double NeoHookeanElasticity::compute_energy(const ElementAssemblyValues &vals, const Eigen::MatrixXd &displacement, const QuadratureVector &da) const
 	{
 		return compute_energy_aux<double>(vals, displacement, da);
@@ -366,7 +366,7 @@ namespace polyfem
 		}
 		return energy;
 	}
-*/
+
 	template <int dim>
 	Eigen::Matrix<double, dim, dim> hat(const Eigen::Matrix<double, dim, 1> &x)
 	{

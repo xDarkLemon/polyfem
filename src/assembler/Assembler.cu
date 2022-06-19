@@ -15,22 +15,6 @@
 namespace polyfem
 {
 
-	template<class LocalAssembler>
-	__global__ void compute_energy_GPU(ElementAssemblyValues &vals, const Eigen::MatrixXd &displacement , QuadratureVector &da, int n_bases,double *result, LocalAssembler gg)
-	{
-   		int bx = blockIdx.x;
-   		int tx = threadIdx.x; 
-		int inner_index = bx * NUMBER_THREADS + tx;
-		if(inner_index < n_bases)
-		{
-		//	double val = gg.compute_energy(vals, displacement, da);
-		}
-
-		return;
-	}
-
-// ITS MUCH BETTER IDEA TO MOVE ALL ENERGY COMP HERE
-
 	template <class LocalAssembler>
 	double NLAssembler<LocalAssembler>::assemble_GPU(
 //		const bool is_volume,
@@ -40,69 +24,85 @@ namespace polyfem
 		const Eigen::MatrixXd &displacement) const
 	{
 		const int n_bases = cache.cache_data_size();
-
-//		double *result_dev=NULL;
-
-//		size_t grid_x = (n_bases%NUMBER_THREADS==0) ? n_bases/NUMBER_THREADS : n_bases/NUMBER_THREADS +1;
+		double store_val = 0.0;
 
 		const ElementAssemblyValues* vals_array = cache.access_cache_data();
-		auto da_array = new QuadratureVector[n_bases];
-		double store_val = 0.0;
-		double lambda, mu;
+
+		thrust::device_vector<double> displacement_dev(displacement.col(0).begin(),displacement.col(0).end());
+
+		int jac_it_N = vals_array[0].jac_it.size();
+		thrust::device_vector<Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, 0, 3, 3>> jac_it_dev(n_bases*jac_it_N);
+
+
+		int basis_values_N = vals_array[0].basis_values.size();
+		int global_columns_N = vals_array[0].basis_values[0].global.size();
+		thrust::device_vector<Local2Global> global_data_dev(global_columns_N*basis_values_N);
+
+		thrust::host_vector<Eigen::Matrix<double,-1,1,0,3,1>> da_host(n_bases);
 
 		for (int e = 0; e < n_bases; ++e)
 		{
-//			const Quadrature &quadrature = vals_array[e].quadrature;
 			assert(MAX_QUAD_POINTS == -1 || vals_array[e].quadrature.weights.size() < MAX_QUAD_POINTS);
-			da_array[e] = vals_array[e].det.array() * vals_array[e].quadrature.weights.array();
+			int N = vals_array[e].det.size();
+			da_host[e].resize(N,1);
+			da_host[e] = vals_array[e].det.array() * vals_array[e].quadrature.weights.array();
+
+			thrust::copy(vals_array[e].jac_it.begin(),vals_array[e].jac_it.end(), jac_it_dev.begin()+e*jac_it_N);
+			for (int f = 0 ; f<basis_values_N; f++)
+				thrust::copy(vals_array[e].basis_values[f].global.begin(),vals_array[e].basis_values[f].global.end(), global_data_dev.begin()+e*(basis_values_N*global_columns_N)+f*global_columns_N);
 		}
 
+		thrust::device_vector<Eigen::Matrix<double,-1,1,0,3,1>> da_dev(n_bases);
+		thrust::copy(da_host.begin(), da_host.end(), da_dev.begin());
+
+		double lambda, mu;
+		const int n_pts = da_host[0].size();
+
+		thrust::device_vector<Eigen::Matrix<double,-1,1,0,3,1>> grad_dev(n_bases*basis_values_N*n_pts);
+		for (int e = 0; e < n_bases; ++e)
+		{
+			for (int f = 0 ; f<basis_values_N; f++){
+				for(int p =0; p<n_pts;p++)
+					grad_dev[e*basis_values_N*n_pts+f*n_pts+p] = vals_array[e].basis_values[f].grad.row(p);
+//					thrust::copy(vals_array[e].basis_values[f].grad.row(p).begin(),vals_array[e].basis_values[f].grad.row(p).end(), grad_dev.begin()+e*(basis_values_N*global_columns_N)+f*global_columns_N+p);
+			}
+		}
+
+
 // extract all lambdas and mus and set to device vector
-/*
-		const int n_pts = da_array[0].size();
 		thrust::device_vector<double> lambda_array(n_pts);
 		thrust::device_vector<double> mu_array(n_pts);
-		for (int p=0; p<n_pts; p++ ){
+		for (int p=0; p<n_pts; p++){
+
 			local_assembler_.get_lambda_mu(vals_array[0].quadrature.points.row(p), vals_array[0].val.row(p),vals_array[0].element_id, lambda, mu);
 			lambda_array[p] = lambda;
 			mu_array[p] = mu;
 		}
-*/
-		for (int e = 0; e < n_bases; ++e)
-		{
-			const double val = local_assembler_.compute_energy(vals_array[e], displacement, da_array[e]);
-			store_val += val;
-		}
-/*		
-		int sumarray_data_size = grid_x * sizeof(double); 
-		double *result = new double[sumarray_data_size];
 
-		result_dev = ALLOCATE_GPU<double>(result_dev,sumarray_data_size);
+// READY TO SEND ALL TO GPU
 
-		compute_energy_GPU<LocalAssembler><<<grid_x,NUMBER_THREADS>>>(vals, displacement, da, n_bases, result_dev, local_assembler_);
-		//const double val = local_assembler_.compute_energy(vals, displacement, da);
-		//store_val += val;
+	double* displacement_dev_ptr = thrust::raw_pointer_cast( displacement_dev.data() );
+	Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, 0, 3, 3>* jac_it_dev_ptr =thrust::raw_pointer_cast( jac_it_dev.data() );
+	Local2Global* global_data_dev_ptr = thrust::raw_pointer_cast( global_data_dev.data() );
+	Eigen::Matrix<double,-1,1,0,3,1>* da_dev_ptr = thrust::raw_pointer_cast( da_dev.data() );
+	Eigen::Matrix<double,-1,1,0,3,1>* grad_dev_ptr = thrust::raw_pointer_cast( grad_dev.data() );
 
-		COPYDATATOHOST<double>(result,result_dev,sumarray_data_size);
-		cudaFree(result_dev);
-		double test_return = result[0];
-		free(result);
-		return test_return;
-*/
+	thrust::device_vector<double> energy_dev_storage(1);
+	double* energy_dev_storage_ptr = thrust::raw_pointer_cast(energy_dev_storage.data() );
+
+	local_assembler_.compute_energy_gpu(displacement_dev_ptr,
+	jac_it_dev_ptr,
+	global_data_dev_ptr,
+	da_dev_ptr,
+	grad_dev_ptr,
+	n_bases,
+	basis_values_N,
+	global_columns_N,
+	energy_dev_storage_ptr
+	);
 
 
-		return store_val;
-		
-/*
-		int sumarray_data_size = grid_x * sizeof(double); 
-		double *result = new double[sumarray_data_size];
-		result_dev = ALLOCATE_GPU<double>(result_dev,sumarray_data_size);
-		COPYDATATOHOST<double>(result,result_dev,sumarray_data_size);
-		cudaFree(result_dev);
-		double test_return = result[0];
-		free(result);
-		return test_return;
-*/
+	return store_val;
 	}
 
 	//template instantiation

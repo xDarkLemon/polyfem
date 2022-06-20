@@ -175,6 +175,7 @@ namespace polyfem
 			return saint_venant_elasticity_.assemble(is_volume, bases, gbases, cache, displacement);
 		else if (assembler == "NeoHookean")
 			return neo_hookean_elasticity_.assemble_GPU(cache, displacement);
+//			return neo_hookean_elasticity_.assemble(is_volume, bases, gbases, cache, displacement);
 		else if (assembler == "MultiModels")
 			return multi_models_elasticity_.assemble(is_volume, bases, gbases, cache, displacement);
 

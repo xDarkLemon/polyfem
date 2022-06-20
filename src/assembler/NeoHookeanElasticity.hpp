@@ -3,10 +3,13 @@
 #include <polyfem/Common.hpp>
 #include <polyfem/ElasticityUtils.hpp>
 
+#include <thrust/functional.h>
+#include <thrust/reduce.h>
 #include <thrust/device_vector.h>
 #include <thrust/copy.h>
 #include <thrust/host_vector.h>
 #include <polyfem/CUDA_utilities.cuh>
+
 #include <polyfem/ElementAssemblyValues.hpp>
 #include <polyfem/ElementBases.hpp>
 #include <polyfem/AutodiffTypes.hpp>
@@ -37,6 +40,9 @@ namespace polyfem
 		int n_bases,
 		int basis_values_N,
 		int global_columns_N,
+		int n_pts,
+		double lambda,
+		double mu,
 		double* energy_storage) const;
 
 		//rhs for fabbricated solution, compute with automatic sympy code

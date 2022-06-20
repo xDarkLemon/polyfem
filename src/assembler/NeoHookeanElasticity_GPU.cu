@@ -49,66 +49,70 @@ namespace polyfem
 	Local2Global* global_data,
 	Eigen::Matrix<double,-1,1,0,3,1>* da,
 	Eigen::Matrix<double,-1,1,0,3,1>* grad,
+	int N,
 	int bv_N,
 	int gc_N,
-	int general_size,
+	int n_pts,
+	int _size,
+	double lambda,
+	double mu,
 	T* energy_storage)
 	{
 		int bx = blockIdx.x;
    		int tx = threadIdx.x; 
-		int inner_index = bx * NUMBER_THREADS + tx;
+		int b_index = bx * NUMBER_THREADS + tx;
 
-		if(inner_index < 1)
+		if(b_index < N)
 		{
-			Eigen::Matrix<double, Eigen::Dynamic, 1> local_dispv(bv_N * general_size, 1);
+			Eigen::Matrix<double, Eigen::Dynamic, 1> local_dispv(bv_N * _size, 1);
 			local_dispv.setZero();
 			for (int i = 0; i < bv_N; ++i)
 			{
 				for (int ii = 0; ii < gc_N; ++ii)
 				{
-					for (int d = 0; d < general_size; ++d)
+					for (int d = 0; d < _size; ++d)
 					{
 						//take care of the threads it is not complete
-						local_dispv(i * general_size + d) += global_data[ii].val * displacement[global_data[ii].index * general_size + d];
+						local_dispv(i * _size + d) += global_data[b_index*bv_N*gc_N+i*gc_N+ii].val * displacement[global_data[b_index*bv_N*gc_N+i*gc_N+ii].index * _size + d];
 					}
 				}
 			}
 
 			T energy = T(0.0);
-			Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic, 0, 3, 3> def_grad(general_size, general_size);
+			Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic, 0, 3, 3> def_grad(_size, _size);
 
-			for (long p = 0; p < 1; ++p)
+			for (long p = 0; p < n_pts; ++p)
 			{
 				for (long k = 0; k < def_grad.size(); ++k)
 					def_grad(k) = T(0);
 
 				for (size_t i = 0; i < bv_N; ++i)
 				{
-					for (int d = 0; d < general_size; ++d)
+					for (int d = 0; d < _size; ++d)
 					{
-						for (int c = 0; c < general_size; ++c)
+						for (int c = 0; c < _size; ++c)
 						{
-							def_grad(d, c) += grad[0](c) * local_dispv(i * general_size + d);
+							def_grad(d, c) += grad[b_index*bv_N*n_pts+i*n_pts+p](c) * local_dispv(i * _size + d);
 						}
 					}
 				}
-
-				Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic, 0, 3, 3> jac_it(general_size, general_size);
+				Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic, 0, 3, 3> jac_it(_size, _size);
 				for (long k = 0; k < jac_it.size(); ++k)
-					jac_it(k) = T(jac_it_array[p](k));
+					jac_it(k) = T(jac_it_array[b_index*n_pts+p](k));
 				def_grad = def_grad * jac_it;
 
 				//Id + grad d
-				for (int d = 0; d < general_size; ++d)
+				for (int d = 0; d < _size; ++d)
 					def_grad(d, d) += T(1);
-				double lambda = 1.0;
-				double mu = 2.0;
-				const T log_det_j = log(def_grad.determinant());
-				const T val = mu / 2 * ((def_grad.transpose() * def_grad).trace() - general_size - 2 * log_det_j) + lambda / 2 * log_det_j * log_det_j;
 
-				energy += val * da[inner_index](p);
-			}	
-		energy_storage[inner_index] = energy;
+				const T log_det_j = log(def_grad.determinant());
+				const T val = mu / 2 * ((def_grad.transpose() * def_grad).trace() - _size - 2 * log_det_j) + lambda / 2 * log_det_j * log_det_j;
+
+				energy += val * da[b_index](p);
+
+			//	printf("%d %lf \n",b_index,energy);
+			}
+			energy_storage[b_index] = energy;
 		}
 
 	}
@@ -122,11 +126,14 @@ namespace polyfem
 	int n_bases,
 	int bv_N,
 	int gc_N,
+	int n_pts,
+	double lambda,
+	double mu,
 	double* energy_storage) const
 	{
 		int grid = (n_bases%NUMBER_THREADS==0) ? n_bases/NUMBER_THREADS : n_bases/NUMBER_THREADS +1;
 		int threads = (n_bases>NUMBER_THREADS) ? NUMBER_THREADS : n_bases;
-		compute_energy_gpu_aux<double><<<grid,threads>>>(displacement_dev_ptr, jac_it_dev_ptr, global_data_dev_ptr,da_dev_ptr,grad_dev_ptr,bv_N,gc_N,size(),energy_storage);
+		compute_energy_gpu_aux<double><<<grid,threads>>>(displacement_dev_ptr, jac_it_dev_ptr, global_data_dev_ptr,da_dev_ptr,grad_dev_ptr,n_bases,bv_N,gc_N,n_pts,size(),lambda,mu,energy_storage);
 		return;
 	}
 

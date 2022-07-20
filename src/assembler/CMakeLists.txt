@@ -26,6 +26,7 @@ set(SOURCES
 	NeoHookeanElasticity_GPU.cu
 	NeoHookeanElasticity.cpp
 	NeoHookeanElasticity.hpp
+
 	# OgdenElasticity.cpp
 	# OgdenElasticity.hpp
 	RhsAssembler.cpp
@@ -41,6 +42,10 @@ set(SOURCES
 	utils/CUDA_utilities.cuh
 	utils/CUDA_utilities.cu
 )
+
+if(WITH_GPU)
+	add_definitions(-DUSE_GPU)
+endif()
 
 prepend_current_path(SOURCES)
 polyfem_copy_headers(${SOURCES})

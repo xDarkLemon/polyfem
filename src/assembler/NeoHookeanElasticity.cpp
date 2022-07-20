@@ -358,8 +358,10 @@ namespace polyfem
 
 			double lambda, mu;
 			params_.lambda_mu(vals.quadrature.points.row(p), vals.val.row(p), vals.element_id, lambda, mu);
-
+//			printf(" %lf eigen \n",def_grad.determinant());
+//			printf(" %lf polyfem \n",polyfem::determinant(def_grad));
 			const T log_det_j = log(polyfem::determinant(def_grad));
+//			printf(" %lf log_det \n",log_det_j);
 			const T val = mu / 2 * ((def_grad.transpose() * def_grad).trace() - size() - 2 * log_det_j) + lambda / 2 * log_det_j * log_det_j;
 
 			energy += val * da(p);

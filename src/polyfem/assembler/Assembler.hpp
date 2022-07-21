@@ -100,6 +100,13 @@ namespace polyfem
 				const AssemblyValsCache &cache,
 				const Eigen::MatrixXd &displacement) const;
 
+			double assemble_GPU(
+				const bool is_volume,
+				const std::vector<basis::ElementBases> &bases,
+				const std::vector<basis::ElementBases> &gbases,
+				const AssemblyValsCache &cache,
+				const Eigen::MatrixXd &displacement) const;
+
 			inline LocalAssembler &local_assembler() { return local_assembler_; }
 			inline const LocalAssembler &local_assembler() const { return local_assembler_; }
 

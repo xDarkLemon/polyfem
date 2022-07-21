@@ -119,7 +119,7 @@ option(LIBIGL_WITH_VIEWER "Use OpenGL viewer" OFF)
 option(LIBIGL_WITH_XML "Use XML" OFF)
 option(LIBIGL_WITH_TETGEN "Use Tetgen" OFF)
 
-set(WITH_GPU OFF)
+set(WITH_GPU ON)
 
 if(WITH_GPU)
     message(STATUS "USING GPU")

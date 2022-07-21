@@ -182,7 +182,7 @@ namespace polyfem
 				update_constraint_set(displaced_surface);
 				ipc::construct_friction_constraint_set(
 					state.collision_mesh, displaced_surface, _constraint_set,
-					_dhat, _barrier_stiffness, _mu, _friction_constraint_set);
+					_dhat, _barrier_stiffness, _mu, _friction_constraint_set,0);
 					// 0 probable NEEDS to be added at the end
 			}
 

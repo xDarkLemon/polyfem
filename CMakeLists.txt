@@ -7,7 +7,7 @@ else()
 endif()
 
 # Check required CMake version
-set(REQUIRED_CMAKE_VERSION "3.14.0")
+set(REQUIRED_CMAKE_VERSION "3.19.0")
 if(POLYFEM_TOPLEVEL_PROJECT)
     cmake_minimum_required(VERSION ${REQUIRED_CMAKE_VERSION})
 else()
@@ -83,7 +83,7 @@ option(POLYFEM_WITH_CLIPPER   "Use clipper, necessary for polygonal bases"  ON)
 option(POLYSOLVE_WITH_CHOLMOD          "Enable Cholmod library"            ON)
 option(POLYSOLVE_WITH_UMFPACK          "Enable UmfPack library"            ON)
 option(POLYSOLVE_WITH_SUPERLU          "Enable SuperLU library"            ON)
-option(POLYSOLVE_WITH_MKL              "Enable MKL library"                ON)
+option(POLYSOLVE_WITH_MKL              "Enable MKL library"                OFF)
 option(POLYSOLVE_WITH_PARDISO          "Enable Pardiso library"            OFF)
 option(POLYSOLVE_WITH_HYPRE            "Enable hypre"                      ON)
 option(POLYSOLVE_WITH_AMGCL            "Use AMGCL"                         ON)
@@ -144,7 +144,7 @@ polyfem_autogen(polyfem elasticity_rhs.py auto_elasticity_rhs)
 target_include_directories(polyfem PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 
 # Extra warnings
-target_link_libraries(polyfem PRIVATE warnings::all)
+# target_link_libraries(polyfem PRIVATE warnings::all)
 
 
 # Use C++17
@@ -284,6 +284,7 @@ if(POLYFEM_TOPLEVEL_PROJECT)
     add_executable(${PROJECT_NAME}_bin src/polyfem/main.cpp)
 
     target_compile_features(${PROJECT_NAME}_bin PUBLIC ${CXX14_FEATURES})
+
     include(cli11)
     target_link_libraries(${PROJECT_NAME}_bin
         PUBLIC
@@ -332,7 +333,7 @@ endif()
 # CUDA
 ################################################################################
 
-if(IPC_TOOLKIT_WITH_CUDA)
+# if(1)
   include(CheckLanguage)
   check_language(CUDA)
   if(CMAKE_CUDA_COMPILER)
@@ -342,14 +343,16 @@ if(IPC_TOOLKIT_WITH_CUDA)
   endif()
 
   set_target_properties(polyfem PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
-
+  #  foreach(flag IN LISTS ${CXX17_FEATURES})
+  #  add_compile_options("$<$<COMPILE_LANGUAGE:CUDA>:--compiler-options=${flag}>")
+  # endforeach()
   # Nvidia RTX8000 -> compute_75
   # Nvidia V100 -> compute_70
   # Nvidia 1080/1080Ti -> compute_61
   # Nvidia 3080Ti -> compute_86
   if(NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
-    set(CMAKE_CUDA_ARCHITECTURES 70 75 86)
+    set(CMAKE_CUDA_ARCHITECTURES 60 70 75 86)
   endif()
-  set_target_properties(polyfem PROPERTIES CUDA_ARCHITECTURES "70;75;86")
-  set_target_properties(PolyFEM_bin PROPERTIES CUDA_ARCHITECTURES "70;75;86")
-endif()
+  set_target_properties(polyfem PROPERTIES CUDA_ARCHITECTURES "60;70;75;86")
+  set_target_properties(PolyFEM_bin PROPERTIES CUDA_ARCHITECTURES "60;70;75;86")
+  # endif()

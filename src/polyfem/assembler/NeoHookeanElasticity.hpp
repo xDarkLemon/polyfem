@@ -26,7 +26,7 @@ namespace polyfem
 			Eigen::VectorXd assemble_grad(const ElementAssemblyValues &vals, const Eigen::MatrixXd &displacement, const QuadratureVector &da) const;
 
 			double compute_energy(const ElementAssemblyValues &vals, const Eigen::MatrixXd &displacement, const QuadratureVector &da) const;
-
+			double compute_energy_GPU(const ElementAssemblyValues &vals, const Eigen::MatrixXd &displacement, const QuadratureVector &da) const;
 			//rhs for fabbricated solution, compute with automatic sympy code
 			Eigen::Matrix<double, Eigen::Dynamic, 1, 0, 3, 1>
 			compute_rhs(const AutodiffHessianPt &pt) const;

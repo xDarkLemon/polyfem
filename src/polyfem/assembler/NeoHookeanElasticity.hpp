@@ -45,8 +45,8 @@ namespace polyfem
 									int basis_values_N,
 									int global_columns_N,
 									int n_pts,
-									double lambda,
-									double mu,
+									double *lambda_ptr,
+									double *mu_ptr,
 									double *energy_storage) const;
 
 >>>>>>> 18d6bc34... fixing problems after merging

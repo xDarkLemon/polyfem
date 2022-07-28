@@ -53,6 +53,7 @@ __pycache__
 .vscode/
 .idea/
 build/
+test_build/
 cmake-build-*/
 bin*
 bin_rel*

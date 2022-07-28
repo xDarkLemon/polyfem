@@ -80,6 +80,16 @@ namespace polyfem
 				const AssemblyValsCache &cache,
 				const Eigen::MatrixXd &displacement,
 				Eigen::MatrixXd &rhs) const;
+
+			void assemble_grad_GPU(
+				const bool is_volume,
+				const int n_basis,
+				const std::vector<basis::ElementBases> &bases,
+				const std::vector<basis::ElementBases> &gbases,
+				const AssemblyValsCache &cache,
+				const Eigen::MatrixXd &displacement,
+				Eigen::MatrixXd &rhs) const;
+
 			//assemble hessian of energy (grad)
 			void assemble_hessian(
 				const bool is_volume,

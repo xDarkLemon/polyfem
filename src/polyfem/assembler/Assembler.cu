@@ -14,14 +14,19 @@
 
 namespace polyfem
 {
+
+	using namespace basis;
+	using namespace quadrature;
+	using namespace utils;
+
 	namespace assembler
 	{
 
 		template <class LocalAssembler>
 		double NLAssembler<LocalAssembler>::assemble_GPU(
 			const bool is_volume,
-			const std::vector<basis::ElementBases> &bases,
-			const std::vector<basis::ElementBases> &gbases,
+			const std::vector<ElementBases> &bases,
+			const std::vector<ElementBases> &gbases,
 			const AssemblyValsCache &cache,
 			const Eigen::MatrixXd &displacement) const
 		{
@@ -54,7 +59,7 @@ namespace polyfem
 
 				thrust::copy(vals_array[e].jac_it.begin(), vals_array[e].jac_it.end(), jac_it_dev.begin() + e * jac_it_N);
 				for (int f = 0; f < basis_values_N; f++)
-					//needs to be fixed
+					//needs to be checked
 					thrust::copy(vals_array[e].basis_values[f].global.begin(), vals_array[e].basis_values[f].global.end(), global_data_dev.begin() + e * (basis_values_N * global_columns_N) + f * global_columns_N);
 			}
 
@@ -93,6 +98,9 @@ namespace polyfem
 			Eigen::Matrix<double, -1, 1, 0, 3, 1> *da_dev_ptr = thrust::raw_pointer_cast(da_dev.data());
 			Eigen::Matrix<double, -1, 1, 0, 3, 1> *grad_dev_ptr = thrust::raw_pointer_cast(grad_dev.data());
 
+			double *lambda_ptr = thrust::raw_pointer_cast(lambda_array.data());
+			double *mu_ptr = thrust::raw_pointer_cast(mu_array.data());
+
 			thrust::device_vector<double> energy_dev_storage(n_bases, double(0.0));
 			double *energy_dev_storage_ptr = thrust::raw_pointer_cast(energy_dev_storage.data());
 
@@ -106,8 +114,8 @@ namespace polyfem
 												basis_values_N,
 												global_columns_N,
 												n_pts,
-												lambda,
-												mu,
+												lambda_ptr,
+												mu_ptr,
 												energy_dev_storage_ptr);
 
 			cudaDeviceSynchronize();
@@ -117,6 +125,83 @@ namespace polyfem
 			store_val = thrust::reduce(energy_stg.begin(), energy_stg.end(), init, thrust::plus<double>());
 
 			return store_val;
+		}
+
+		template <class LocalAssembler>
+		void NLAssembler<LocalAssembler>::assemble_grad_GPU(
+			const bool is_volume,
+			const int n_basis,
+			const std::vector<ElementBases> &bases,
+			const std::vector<ElementBases> &gbases,
+			const AssemblyValsCache &cache,
+			const Eigen::MatrixXd &displacement,
+			Eigen::MatrixXd &rhs) const
+		{
+			rhs.resize(n_basis * local_assembler_.size(), 1);
+			rhs.setZero();
+
+			//			auto storage = create_thread_storage(LocalThreadVecStorage(rhs.size()));
+
+			const int n_bases = int(bases.size());
+
+			//			maybe_parallel_for(n_bases, [&](int start, int end, int thread_id) {
+			//				LocalThreadVecStorage &local_storage = get_local_thread_storage(storage, thread_id);
+			Eigen::MatrixXd vec;
+			vec.resize(rhs.size(), 1);
+			vec.setZero();
+			QuadratureVector da;
+			ElementAssemblyValues val_dum;
+			//			std::vector<ElementAssemblyValues> vals(n_bases);
+			ElementAssemblyValues &vals = val_dum;
+			for (int e = 0; e < n_bases; ++e)
+			{
+				// igl::Timer timer; timer.start();
+
+				// vals.compute(e, is_volume, bases[e], gbases[e]);
+				cache.compute(e, is_volume, bases[e], gbases[e], vals);
+				const Quadrature &quadrature = vals.quadrature;
+
+				assert(MAX_QUAD_POINTS == -1 || quadrature.weights.size() < MAX_QUAD_POINTS);
+				da = vals.det.array() * quadrature.weights.array();
+				const int n_loc_bases = int(vals.basis_values.size());
+
+				const auto val = local_assembler_.assemble_grad(vals, displacement, da);
+				assert(val.size() == n_loc_bases * local_assembler_.size());
+
+				for (int j = 0; j < n_loc_bases; ++j)
+				{
+					const auto &global_j = vals.basis_values[j].global;
+
+					// igl::Timer t1; t1.start();
+					for (int m = 0; m < local_assembler_.size(); ++m)
+					{
+						const double local_value = val(j * local_assembler_.size() + m);
+						if (std::abs(local_value) < 1e-30)
+						{
+							continue;
+						}
+
+						for (size_t jj = 0; jj < global_j.size(); ++jj)
+						{
+							const auto gj = global_j[jj].index * local_assembler_.size() + m;
+							const auto wj = global_j[jj].val;
+
+							vec(gj) += local_value * wj;
+						}
+					}
+
+					// t1.stop();
+					// if (!vals.has_parameterization) { std::cout << "-- t1: " << t1.getElapsedTime() << std::endl; }
+				}
+
+				// timer.stop();
+				// if (!vals.has_parameterization) { std::cout << "-- Timer: " << timer.getElapsedTime() << std::endl; }
+			}
+			//			});
+
+			// Serially merge local storages
+			//		for (const LocalThreadVecStorage &local_storage : storage)
+			rhs += vec;
 		}
 
 		//template instantiation

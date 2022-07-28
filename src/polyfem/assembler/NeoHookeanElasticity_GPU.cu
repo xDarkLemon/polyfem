@@ -12,30 +12,6 @@ namespace polyfem
 	namespace assembler
 	{
 
-		__global__ void set_dispv(Local2Global *bvs_data, int *bvs_sizes, double *displacement_dev, int size, int bvs_total_size, double *local_disp)
-		{
-			int bx = blockIdx.x;
-			int tx = threadIdx.x;
-			int inner_index = bx * NUMBER_THREADS + tx;
-			double result = 0.0;
-
-			if (inner_index < bvs_total_size)
-			{
-				for (size_t ii = 0; ii < bvs_sizes[inner_index]; ++ii)
-				{
-					for (size_t ii = 0; ii < bvs_sizes[inner_index]; ++ii)
-					{
-						for (int d = 0; d < size; ++d)
-						{
-							result = bvs_data[inner_index + ii * bvs_total_size].val * displacement_dev[bvs_data[inner_index + ii * bvs_total_size].index * size + d];
-							local_disp[inner_index * size + d] += result;
-						}
-					}
-				}
-			}
-			return;
-		}
-
 		template <typename T>
 		__device__ T kernel_det(Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic, 0, 3, 3> &mat, double &result)
 		{
@@ -63,8 +39,8 @@ namespace polyfem
 											   int gc_N,
 											   int n_pts,
 											   int _size,
-											   double lambda,
-											   double mu,
+											   double *lambda,
+											   double *mu,
 											   T *energy_storage)
 		{
 			int bx = blockIdx.x;
@@ -117,7 +93,7 @@ namespace polyfem
 					double _det;
 					kernel_det(def_grad, _det);
 					const T log_det_j = log(_det);
-					const T val = mu / 2 * ((def_grad.transpose() * def_grad).trace() - _size - 2 * log_det_j) + lambda / 2 * log_det_j * log_det_j;
+					const T val = mu[p] / 2 * ((def_grad.transpose() * def_grad).trace() - _size - 2 * log_det_j) + lambda[p] / 2 * log_det_j * log_det_j;
 
 					energy += val * da[b_index](p);
 				}
@@ -135,8 +111,8 @@ namespace polyfem
 													  int bv_N,
 													  int gc_N,
 													  int n_pts,
-													  double lambda,
-													  double mu,
+													  double *lambda,
+													  double *mu,
 													  double *energy_storage) const
 		{
 			int grid = (n_bases % NUMBER_THREADS == 0) ? n_bases / NUMBER_THREADS : n_bases / NUMBER_THREADS + 1;

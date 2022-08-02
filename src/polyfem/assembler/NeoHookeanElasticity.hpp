@@ -32,6 +32,21 @@ namespace polyfem
 			Eigen::MatrixXd assemble_hessian(const ElementAssemblyValues &vals, const Eigen::MatrixXd &displacement, const QuadratureVector &da) const;
 			Eigen::VectorXd assemble_grad(const ElementAssemblyValues &vals, const Eigen::MatrixXd &displacement, const QuadratureVector &da) const;
 
+			//			template <typename T>
+			Eigen::VectorXd assemble_grad_GPU(double *displacement_dev_ptr,
+											  Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, 0, 3, 3> *jac_it_dev_ptr,
+											  basis::Local2Global *global_data_dev_ptr,
+											  Eigen::Matrix<double, -1, 1, 0, 3, 1> *da_dev_ptr,
+											  Eigen::Matrix<double, -1, -1, 0, 3, 3> *grad_dev_ptr,
+											  int n_bases,
+											  int basis_values_N,
+											  int global_columns_N,
+											  int n_pts,
+											  double *lambda_ptr,
+											  double *mu_ptr,
+											  //					   double *val_grad_ptr, int n_basis) const;
+											  int n_basis) const;
+
 			double compute_energy(const ElementAssemblyValues &vals, const Eigen::MatrixXd &displacement, const QuadratureVector &da) const;
 
 			void compute_energy_gpu(double *displacement_dev_ptr,
@@ -74,9 +89,6 @@ namespace polyfem
 			//utulity function that computes energy, the template is used for double, DScalar1, and DScalar2 in energy, gradient and hessian
 			template <typename T>
 			T compute_energy_aux(const ElementAssemblyValues &vals, const Eigen::MatrixXd &displacement, const QuadratureVector &da) const;
-
-			template <typename T>
-			T compute_energy_aux_deprecated(const ElementAssemblyValues &vals, const Eigen::MatrixXd &displacement, const QuadratureVector &da) const;
 
 			template <int n_basis, int dim>
 			void compute_energy_hessian_aux_fast(const ElementAssemblyValues &vals, const Eigen::MatrixXd &displacement, const QuadratureVector &da, Eigen::MatrixXd &H) const;

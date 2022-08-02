@@ -32,10 +32,23 @@ namespace polyfem
 			Eigen::MatrixXd assemble_hessian(const ElementAssemblyValues &vals, const Eigen::MatrixXd &displacement, const QuadratureVector &da) const;
 			Eigen::VectorXd assemble_grad(const ElementAssemblyValues &vals, const Eigen::MatrixXd &displacement, const QuadratureVector &da) const;
 
+			//			template <typename T>
+			Eigen::VectorXd assemble_grad_GPU(double *displacement_dev_ptr,
+											  Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, 0, 3, 3> *jac_it_dev_ptr,
+											  basis::Local2Global *global_data_dev_ptr,
+											  Eigen::Matrix<double, -1, 1, 0, 3, 1> *da_dev_ptr,
+											  Eigen::Matrix<double, -1, -1, 0, 3, 3> *grad_dev_ptr,
+											  int n_bases,
+											  int basis_values_N,
+											  int global_columns_N,
+											  int n_pts,
+											  double *lambda_ptr,
+											  double *mu_ptr,
+											  //					   double *val_grad_ptr, int n_basis) const;
+											  int n_basis) const;
+
 			double compute_energy(const ElementAssemblyValues &vals, const Eigen::MatrixXd &displacement, const QuadratureVector &da) const;
 
-<<<<<<< HEAD
-=======
 			void compute_energy_gpu(double *displacement_dev_ptr,
 									Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, 0, 3, 3> *jac_it_dev_ptr,
 									basis::Local2Global *global_data_dev_ptr,
@@ -49,7 +62,6 @@ namespace polyfem
 									double *mu_ptr,
 									double *energy_storage) const;
 
->>>>>>> 18d6bc34... fixing problems after merging
 			//rhs for fabbricated solution, compute with automatic sympy code
 			Eigen::Matrix<double, Eigen::Dynamic, 1, 0, 3, 1>
 			compute_rhs(const AutodiffHessianPt &pt) const;

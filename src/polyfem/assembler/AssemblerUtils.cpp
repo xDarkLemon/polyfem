@@ -204,7 +204,7 @@ namespace polyfem
 				saint_venant_elasticity_.assemble_grad(is_volume, n_basis, bases, gbases, cache, displacement, grad);
 #ifdef USE_GPU
 			else if (assembler == "NeoHookean")
-				neo_hookean_elasticity_.assemble_grad(is_volume, n_basis, bases, gbases, cache, displacement, grad);
+				neo_hookean_elasticity_.assemble_grad_GPU(is_volume, n_basis, bases, gbases, cache, displacement, grad);
 #endif
 #ifndef USE_GPU
 		else if (assembler == "NeoHookean"){

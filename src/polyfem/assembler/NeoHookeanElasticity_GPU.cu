@@ -55,7 +55,7 @@ namespace polyfem
 											   int _size,
 											   double *lambda,
 											   double *mu,
-											   T *energy_storage)
+											   T *energy_val)
 		{
 			int bx = blockIdx.x;
 			int tx = threadIdx.x;
@@ -111,8 +111,16 @@ namespace polyfem
 
 					energy += val * da[b_index](p);
 				}
-				// Could do the reduction here
-				energy_storage[b_index] = energy;
+
+				typedef cub::BlockReduce<double, 32> BlockReduce;
+				// Allocate shared memory for BlockReduce
+				__shared__ typename BlockReduce::TempStorage temp_storage;
+
+				double result_ = BlockReduce(temp_storage).Sum(energy);
+				if (tx == 0)
+				{
+					atomicAdd(&energy_val[0], result_);
+				}
 			}
 		}
 
@@ -252,37 +260,44 @@ namespace polyfem
 					if (tx == 0)
 					{
 						shared_vec[i] = result_;
-						//					atomicAdd(&val[i], shared_vec[i]);
-					}
-				}
-
-				for (int i = 0; i < N_basis_global * size_; i++)
-				{
-					if (tx == 0)
-					{
 						atomicAdd(&result_vec[i], shared_vec[i]);
 					}
 				}
+
+				//				for (int i = 0; i < N_basis_global * size_; i++)
+				//				{
+				//					if (tx == 0)
+				//					{
+				//						//	atomicAdd(&result_vec[i], shared_vec[i]);
+				//					}
+				//				}
 			}
 		}
 
-		void NeoHookeanElasticity::compute_energy_gpu(double *displacement_dev_ptr,
-													  Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, 0, 3, 3> *jac_it_dev_ptr,
-													  Local2Global *global_data_dev_ptr,
-													  Eigen::Matrix<double, -1, 1, 0, 3, 1> *da_dev_ptr,
-													  Eigen::Matrix<double, -1, 1, 0, 3, 1> *grad_dev_ptr,
-													  int n_bases,
-													  int bv_N,
-													  int gc_N,
-													  int n_pts,
-													  double *lambda,
-													  double *mu,
-													  double *energy_storage) const
+		int NeoHookeanElasticity::compute_energy_gpu(double *displacement_dev_ptr,
+													 Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, 0, 3, 3> *jac_it_dev_ptr,
+													 Local2Global *global_data_dev_ptr,
+													 Eigen::Matrix<double, -1, 1, 0, 3, 1> *da_dev_ptr,
+													 Eigen::Matrix<double, -1, 1, 0, 3, 1> *grad_dev_ptr,
+													 int n_bases,
+													 int bv_N,
+													 int gc_N,
+													 int n_pts,
+													 double *lambda,
+													 double *mu) const
+		//													 double *energy_storage) const
 		{
 			int grid = (n_bases % NUMBER_THREADS == 0) ? n_bases / NUMBER_THREADS : n_bases / NUMBER_THREADS + 1;
 			int threads = (n_bases > NUMBER_THREADS) ? NUMBER_THREADS : n_bases;
-			compute_energy_gpu_aux<double><<<grid, threads>>>(displacement_dev_ptr, jac_it_dev_ptr, global_data_dev_ptr, da_dev_ptr, grad_dev_ptr, n_bases, bv_N, gc_N, n_pts, size(), lambda, mu, energy_storage);
-			return;
+
+			thrust::device_vector<double> energy_dev(1, double(0.0));
+			double *energy_ptr = thrust::raw_pointer_cast(energy_dev.data());
+
+			compute_energy_gpu_aux<double><<<grid, threads>>>(displacement_dev_ptr, jac_it_dev_ptr, global_data_dev_ptr, da_dev_ptr, grad_dev_ptr, n_bases, bv_N, gc_N, n_pts, size(), lambda, mu, energy_ptr);
+
+			cudaDeviceSynchronize();
+			thrust::host_vector<double> energy(energy_dev.begin(), energy_dev.end());
+			return energy[0];
 		}
 
 		Eigen::VectorXd
@@ -302,7 +317,7 @@ namespace polyfem
 			int grid = (n_bases % NUMBER_THREADS == 0) ? n_bases / NUMBER_THREADS : n_bases / NUMBER_THREADS + 1;
 			int threads = (n_bases > NUMBER_THREADS) ? NUMBER_THREADS : n_bases;
 
-			thrust::device_vector<double> vec_dev(n_basis * size());
+			thrust::device_vector<double> vec_dev(n_basis * size(), double(0.0));
 			double *vec_ptr = thrust::raw_pointer_cast(vec_dev.data());
 			assert(size() == 3);
 			if (bv_N == 4)

@@ -140,67 +140,97 @@ namespace polyfem
 			rhs.resize(n_basis * local_assembler_.size(), 1);
 			rhs.setZero();
 
-			//			auto storage = create_thread_storage(LocalThreadVecStorage(rhs.size()));
-
 			const int n_bases = int(bases.size());
-
-			//			maybe_parallel_for(n_bases, [&](int start, int end, int thread_id) {
-			//				LocalThreadVecStorage &local_storage = get_local_thread_storage(storage, thread_id);
 			Eigen::MatrixXd vec;
 			vec.resize(rhs.size(), 1);
 			vec.setZero();
-			QuadratureVector da;
-			ElementAssemblyValues val_dum;
-			//			std::vector<ElementAssemblyValues> vals(n_bases);
-			ElementAssemblyValues &vals = val_dum;
+
+			//thrust::device_vector<double> vec_dev(rhs.size());
+
+			std::vector<ElementAssemblyValues> vals_array(n_bases);
+
+			//			ElementAssemblyValues &vals = val_dum;
 			for (int e = 0; e < n_bases; ++e)
 			{
-				// igl::Timer timer; timer.start();
-
-				// vals.compute(e, is_volume, bases[e], gbases[e]);
-				cache.compute(e, is_volume, bases[e], gbases[e], vals);
-				const Quadrature &quadrature = vals.quadrature;
-
-				assert(MAX_QUAD_POINTS == -1 || quadrature.weights.size() < MAX_QUAD_POINTS);
-				da = vals.det.array() * quadrature.weights.array();
-				const int n_loc_bases = int(vals.basis_values.size());
-
-				const auto val = local_assembler_.assemble_grad(vals, displacement, da);
-				assert(val.size() == n_loc_bases * local_assembler_.size());
-
-				for (int j = 0; j < n_loc_bases; ++j)
-				{
-					const auto &global_j = vals.basis_values[j].global;
-
-					// igl::Timer t1; t1.start();
-					for (int m = 0; m < local_assembler_.size(); ++m)
-					{
-						const double local_value = val(j * local_assembler_.size() + m);
-						if (std::abs(local_value) < 1e-30)
-						{
-							continue;
-						}
-
-						for (size_t jj = 0; jj < global_j.size(); ++jj)
-						{
-							const auto gj = global_j[jj].index * local_assembler_.size() + m;
-							const auto wj = global_j[jj].val;
-
-							vec(gj) += local_value * wj;
-						}
-					}
-
-					// t1.stop();
-					// if (!vals.has_parameterization) { std::cout << "-- t1: " << t1.getElapsedTime() << std::endl; }
-				}
-
-				// timer.stop();
-				// if (!vals.has_parameterization) { std::cout << "-- Timer: " << timer.getElapsedTime() << std::endl; }
+				cache.compute(e, is_volume, bases[e], gbases[e], vals_array[e]);
 			}
-			//			});
+			thrust::device_vector<double> displacement_dev(displacement.col(0).begin(), displacement.col(0).end());
+			int jac_it_N = vals_array[0].jac_it.size();
+			//				const Quadrature &quadrature = vals.quadrature;
+			thrust::device_vector<Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, 0, 3, 3>> jac_it_dev(n_bases * jac_it_N);
 
-			// Serially merge local storages
-			//		for (const LocalThreadVecStorage &local_storage : storage)
+			int basis_values_N = vals_array[0].basis_values.size();
+			int global_columns_N = vals_array[0].basis_values[0].global.size();
+			thrust::device_vector<basis::Local2Global> global_data_dev(n_bases * basis_values_N * global_columns_N);
+
+			thrust::host_vector<Eigen::Matrix<double, -1, 1, 0, 3, 1>> da_host(n_bases);
+
+			for (int e = 0; e < n_bases; ++e)
+			{
+				assert(MAX_QUAD_POINTS == -1 || quadrature.weights.size() < MAX_QUAD_POINTS);
+				int N = vals_array[e].det.size();
+				da_host[e].resize(N, 1);
+				da_host[e] = vals_array[e].det.array() * vals_array[e].quadrature.weights.array();
+
+				thrust::copy(vals_array[e].jac_it.begin(), vals_array[e].jac_it.end(), jac_it_dev.begin() + e * jac_it_N);
+				for (int f = 0; f < basis_values_N; f++)
+				{
+					//needs to be checked
+					thrust::copy(vals_array[e].basis_values[f].global.begin(), vals_array[e].basis_values[f].global.end(), global_data_dev.begin() + e * (basis_values_N * global_columns_N) + f * global_columns_N);
+				}
+			}
+
+			thrust::device_vector<Eigen::Matrix<double, -1, 1, 0, 3, 1>> da_dev(n_bases);
+			thrust::copy(da_host.begin(), da_host.end(), da_dev.begin());
+
+			const int n_pts = da_host[0].size();
+
+			thrust::device_vector<Eigen::Matrix<double, -1, -1, 0, 3, 3>> grad_dev(n_bases * basis_values_N * n_pts);
+			for (int e = 0; e < n_bases; ++e)
+			{
+				for (int f = 0; f < basis_values_N; f++)
+				{
+					for (int p = 0; p < n_pts; p++)
+						grad_dev[e * basis_values_N * n_pts + f * n_pts + p] = vals_array[e].basis_values[f].grad.row(p);
+				}
+			}
+
+			// extract all lambdas and mus and set to device vector
+			double lambda, mu;
+			thrust::device_vector<double> lambda_array(n_pts);
+			thrust::device_vector<double> mu_array(n_pts);
+			for (int p = 0; p < n_pts; p++)
+			{
+				local_assembler_.get_lambda_mu(vals_array[0].quadrature.points.row(p), vals_array[0].val.row(p), vals_array[0].element_id, lambda, mu);
+				lambda_array[p] = lambda;
+				mu_array[p] = mu;
+			}
+
+			// READY TO SEND ALL TO GPU
+
+			double *displacement_dev_ptr = thrust::raw_pointer_cast(displacement_dev.data());
+			//	double *vec_ptr = thrust::raw_pointer_cast(vec_dev.data());
+			Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, 0, 3, 3> *jac_it_dev_ptr = thrust::raw_pointer_cast(jac_it_dev.data());
+			basis::Local2Global *global_data_dev_ptr = thrust::raw_pointer_cast(global_data_dev.data());
+			Eigen::Matrix<double, -1, 1, 0, 3, 1> *da_dev_ptr = thrust::raw_pointer_cast(da_dev.data());
+			Eigen::Matrix<double, -1, -1, 0, 3, 3> *grad_dev_ptr = thrust::raw_pointer_cast(grad_dev.data());
+
+			double *lambda_ptr = thrust::raw_pointer_cast(lambda_array.data());
+			double *mu_ptr = thrust::raw_pointer_cast(mu_array.data());
+
+			vec = local_assembler_.assemble_grad_GPU(displacement_dev_ptr,
+													 jac_it_dev_ptr,
+													 global_data_dev_ptr,
+													 da_dev_ptr,
+													 grad_dev_ptr,
+													 n_bases,
+													 basis_values_N,
+													 global_columns_N,
+													 n_pts,
+													 lambda_ptr,
+													 mu_ptr,
+													 n_basis);
+
 			rhs += vec;
 		}
 

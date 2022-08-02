@@ -49,24 +49,26 @@ namespace polyfem
 
 			double compute_energy(const ElementAssemblyValues &vals, const Eigen::MatrixXd &displacement, const QuadratureVector &da) const;
 
-			void compute_energy_gpu(double *displacement_dev_ptr,
-									Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, 0, 3, 3> *jac_it_dev_ptr,
-									basis::Local2Global *global_data_dev_ptr,
-									Eigen::Matrix<double, -1, 1, 0, 3, 1> *da_dev_ptr,
-									Eigen::Matrix<double, -1, 1, 0, 3, 1> *grad_dev_ptr,
-									int n_bases,
-									int basis_values_N,
-									int global_columns_N,
-									int n_pts,
-									double *lambda_ptr,
-									double *mu_ptr,
-									double *energy_storage) const;
+			int compute_energy_gpu(double *displacement_dev_ptr,
+								   Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, 0, 3, 3> *jac_it_dev_ptr,
+								   basis::Local2Global *global_data_dev_ptr,
+								   Eigen::Matrix<double, -1, 1, 0, 3, 1> *da_dev_ptr,
+								   Eigen::Matrix<double, -1, 1, 0, 3, 1> *grad_dev_ptr,
+								   int n_bases,
+								   int basis_values_N,
+								   int global_columns_N,
+								   int n_pts,
+								   double *lambda_ptr,
+								   double *mu_ptr) const;
+			//					   double *energy_storage) const;
 
 			//rhs for fabbricated solution, compute with automatic sympy code
-			Eigen::Matrix<double, Eigen::Dynamic, 1, 0, 3, 1>
-			compute_rhs(const AutodiffHessianPt &pt) const;
+			Eigen::Matrix<double, Eigen::Dynamic, 1, 0, 3, 1> compute_rhs(const AutodiffHessianPt &pt) const;
 
-			inline int size() const { return size_; }
+			inline int size() const
+			{
+				return size_;
+			}
 			void set_size(const int size);
 
 			//von mises and stress tensor
@@ -78,7 +80,10 @@ namespace polyfem
 
 			//sets material params
 			void add_multimaterial(const int index, const json &params);
-			void set_params(const LameParameters &params) { params_ = params; }
+			void set_params(const LameParameters &params)
+			{
+				params_ = params;
+			}
 			void get_lambda_mu(const Eigen::MatrixXd &param, const Eigen::MatrixXd &p, int el_id, double &lambda, double &mu) const;
 
 		private:

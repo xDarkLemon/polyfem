@@ -47,7 +47,7 @@ namespace polyfem
 			int basis_values_N = vals_array[0].basis_values.size();
 			int global_columns_N = vals_array[0].basis_values[0].global.size();
 			thrust::device_vector<basis::Local2Global> global_data_dev(n_bases * basis_values_N * global_columns_N);
-			//		printf("%d \n", n_bases * basis_values_N * global_columns_N * sizeof(Local2Global));
+
 			thrust::host_vector<Eigen::Matrix<double, -1, 1, 0, 3, 1>> da_host(n_bases);
 
 			for (int e = 0; e < n_bases; ++e)
@@ -104,25 +104,23 @@ namespace polyfem
 			thrust::device_vector<double> energy_dev_storage(n_bases, double(0.0));
 			double *energy_dev_storage_ptr = thrust::raw_pointer_cast(energy_dev_storage.data());
 
-			cudaDeviceSynchronize();
-			local_assembler_.compute_energy_gpu(displacement_dev_ptr,
-												jac_it_dev_ptr,
-												global_data_dev_ptr,
-												da_dev_ptr,
-												grad_dev_ptr,
-												n_bases,
-												basis_values_N,
-												global_columns_N,
-												n_pts,
-												lambda_ptr,
-												mu_ptr,
-												energy_dev_storage_ptr);
+			store_val = local_assembler_.compute_energy_gpu(displacement_dev_ptr,
+															jac_it_dev_ptr,
+															global_data_dev_ptr,
+															da_dev_ptr,
+															grad_dev_ptr,
+															n_bases,
+															basis_values_N,
+															global_columns_N,
+															n_pts,
+															lambda_ptr,
+															mu_ptr);
 
-			cudaDeviceSynchronize();
-			thrust::host_vector<double> energy_stg(energy_dev_storage.begin(), energy_dev_storage.end());
-			double init = 0.0;
+			//			cudaDeviceSynchronize();
+			//			thrust::host_vector<double> energy_stg(energy_dev_storage.begin(), energy_dev_storage.end());
+			//			double init = 0.0;
 
-			store_val = thrust::reduce(energy_stg.begin(), energy_stg.end(), init, thrust::plus<double>());
+			//			store_val = thrust::reduce(energy_stg.begin(), energy_stg.end(), init, thrust::plus<double>());
 
 			return store_val;
 		}
@@ -145,18 +143,15 @@ namespace polyfem
 			vec.resize(rhs.size(), 1);
 			vec.setZero();
 
-			//thrust::device_vector<double> vec_dev(rhs.size());
-
 			std::vector<ElementAssemblyValues> vals_array(n_bases);
 
-			//			ElementAssemblyValues &vals = val_dum;
 			for (int e = 0; e < n_bases; ++e)
 			{
 				cache.compute(e, is_volume, bases[e], gbases[e], vals_array[e]);
 			}
 			thrust::device_vector<double> displacement_dev(displacement.col(0).begin(), displacement.col(0).end());
 			int jac_it_N = vals_array[0].jac_it.size();
-			//				const Quadrature &quadrature = vals.quadrature;
+
 			thrust::device_vector<Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, 0, 3, 3>> jac_it_dev(n_bases * jac_it_N);
 
 			int basis_values_N = vals_array[0].basis_values.size();
@@ -175,7 +170,7 @@ namespace polyfem
 				thrust::copy(vals_array[e].jac_it.begin(), vals_array[e].jac_it.end(), jac_it_dev.begin() + e * jac_it_N);
 				for (int f = 0; f < basis_values_N; f++)
 				{
-					//needs to be checked
+					//needs a paranoic check
 					thrust::copy(vals_array[e].basis_values[f].global.begin(), vals_array[e].basis_values[f].global.end(), global_data_dev.begin() + e * (basis_values_N * global_columns_N) + f * global_columns_N);
 				}
 			}
@@ -209,7 +204,7 @@ namespace polyfem
 			// READY TO SEND ALL TO GPU
 
 			double *displacement_dev_ptr = thrust::raw_pointer_cast(displacement_dev.data());
-			//	double *vec_ptr = thrust::raw_pointer_cast(vec_dev.data());
+
 			Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, 0, 3, 3> *jac_it_dev_ptr = thrust::raw_pointer_cast(jac_it_dev.data());
 			basis::Local2Global *global_data_dev_ptr = thrust::raw_pointer_cast(global_data_dev.data());
 			Eigen::Matrix<double, -1, 1, 0, 3, 1> *da_dev_ptr = thrust::raw_pointer_cast(da_dev.data());
@@ -230,7 +225,6 @@ namespace polyfem
 													 lambda_ptr,
 													 mu_ptr,
 													 n_basis);
-
 			rhs += vec;
 		}
 

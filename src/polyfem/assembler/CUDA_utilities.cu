@@ -86,6 +86,16 @@ void mult_trace(T *mat, int n, double *result)
 	multiplicative_trace<<<1, 1>>>(mat, n, result);
 }
 
+__device__ void clock_block(int count)
+{
+	clock_t start_clock = clock();
+	clock_t clock_offset = 0;
+	while (clock_offset < count)
+	{
+		clock_offset = clock() - start_clock;
+	}
+	return;
+}
 template void mult_trace<double>(double *, int, double *);
 /*
 template <typename T>

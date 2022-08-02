@@ -56,7 +56,21 @@ void COPYDATATOHOST(T *A, T *d_A, int _size)
 	}
 }
 
+template <typename T>
+__device__ void DYNAMIC_GPU_ALLOC(T *A, int _size)
+{
+	A = new T[_size];
+}
+
+template <typename T>
+__device__ void DYNAMIC_GPU_FREE(T *A)
+{
+	delete[] A;
+}
+
 void CATCHCUDAERROR(void);
+
+__device__ void clock_block(int count);
 
 template <typename T>
 void mult_trace(T *, int, double *);

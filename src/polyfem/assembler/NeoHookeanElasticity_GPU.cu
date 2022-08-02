@@ -13,7 +13,7 @@ namespace polyfem
 	{
 
 		template <typename T>
-		__device__ T kernel_det(Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic, 0, 3, 3> &mat, double &result)
+		__device__ void kernel_det(T &mat, double &result)
 		{
 
 			if (mat.rows() == 1)
@@ -184,7 +184,7 @@ namespace polyfem
 					def_grad = local_disp.transpose() * grad * jac_it + Eigen::Matrix<double, dim, dim>::Identity(size_, size_);
 
 					double J;
-					kernel_det(def_grad, J);
+					kernel_det<Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, 0, dim, dim>>(def_grad, J);
 					const double log_det_j = log(J);
 
 					Eigen::Matrix<double, dim, dim> delJ_delF(size_, size_);
@@ -319,15 +319,49 @@ namespace polyfem
 
 			thrust::device_vector<double> vec_dev(n_basis * size(), double(0.0));
 			double *vec_ptr = thrust::raw_pointer_cast(vec_dev.data());
-			assert(size() == 3);
-			if (bv_N == 4)
+			if (size() == 2)
 			{
-				compute_energy_aux_gradient_fast_GPU<4, 3><<<grid, threads, n_basis * size() * sizeof(double)>>>(n_basis, displacement_dev_ptr, jac_it_dev_ptr, global_data_dev_ptr, da_dev_ptr, grad_dev_ptr, n_bases, bv_N, gc_N, n_pts, size(), lambda, mu, vec_ptr);
-				cudaDeviceSynchronize();
-				thrust::host_vector<double> vec_stg(vec_dev.begin(), vec_dev.end());
-				Eigen::Matrix<double, -1, 1> gradient(Eigen::Map<Eigen::Matrix<double, -1, 1>>(vec_stg.data(), vec_stg.size()));
-				return gradient;
+				if (bv_N == 3)
+				{
+					compute_energy_aux_gradient_fast_GPU<3, 2><<<grid, threads, n_basis * size() * sizeof(double)>>>(n_basis, displacement_dev_ptr, jac_it_dev_ptr, global_data_dev_ptr, da_dev_ptr, grad_dev_ptr, n_bases, bv_N, gc_N, n_pts, size(), lambda, mu, vec_ptr);
+				}
+				else if (bv_N == 6)
+				{
+					compute_energy_aux_gradient_fast_GPU<6, 2><<<grid, threads, n_basis * size() * sizeof(double)>>>(n_basis, displacement_dev_ptr, jac_it_dev_ptr, global_data_dev_ptr, da_dev_ptr, grad_dev_ptr, n_bases, bv_N, gc_N, n_pts, size(), lambda, mu, vec_ptr);
+				}
+				else if (bv_N == 10)
+				{
+					compute_energy_aux_gradient_fast_GPU<10, 2><<<grid, threads, n_basis * size() * sizeof(double)>>>(n_basis, displacement_dev_ptr, jac_it_dev_ptr, global_data_dev_ptr, da_dev_ptr, grad_dev_ptr, n_bases, bv_N, gc_N, n_pts, size(), lambda, mu, vec_ptr);
+				}
+				else
+				{
+					compute_energy_aux_gradient_fast_GPU<Eigen::Dynamic, 2><<<grid, threads, n_basis * size() * sizeof(double)>>>(n_basis, displacement_dev_ptr, jac_it_dev_ptr, global_data_dev_ptr, da_dev_ptr, grad_dev_ptr, n_bases, bv_N, gc_N, n_pts, size(), lambda, mu, vec_ptr);
+				}
 			}
+			else //if (size() == 3)
+			{
+				assert(size() == 3);
+				if (bv_N == 4)
+				{
+					compute_energy_aux_gradient_fast_GPU<4, 3><<<grid, threads, n_basis * size() * sizeof(double)>>>(n_basis, displacement_dev_ptr, jac_it_dev_ptr, global_data_dev_ptr, da_dev_ptr, grad_dev_ptr, n_bases, bv_N, gc_N, n_pts, size(), lambda, mu, vec_ptr);
+				}
+				else if (bv_N == 10)
+				{
+					compute_energy_aux_gradient_fast_GPU<10, 3><<<grid, threads, n_basis * size() * sizeof(double)>>>(n_basis, displacement_dev_ptr, jac_it_dev_ptr, global_data_dev_ptr, da_dev_ptr, grad_dev_ptr, n_bases, bv_N, gc_N, n_pts, size(), lambda, mu, vec_ptr);
+				}
+				else if (bv_N == 20)
+				{
+					compute_energy_aux_gradient_fast_GPU<20, 3><<<grid, threads, n_basis * size() * sizeof(double)>>>(n_basis, displacement_dev_ptr, jac_it_dev_ptr, global_data_dev_ptr, da_dev_ptr, grad_dev_ptr, n_bases, bv_N, gc_N, n_pts, size(), lambda, mu, vec_ptr);
+				}
+				else
+				{
+					compute_energy_aux_gradient_fast_GPU<Eigen::Dynamic, 3><<<grid, threads, n_basis * size() * sizeof(double)>>>(n_basis, displacement_dev_ptr, jac_it_dev_ptr, global_data_dev_ptr, da_dev_ptr, grad_dev_ptr, n_bases, bv_N, gc_N, n_pts, size(), lambda, mu, vec_ptr);
+				}
+			}
+			cudaDeviceSynchronize();
+			thrust::host_vector<double> vec_stg(vec_dev.begin(), vec_dev.end());
+			Eigen::Matrix<double, -1, 1> vec(Eigen::Map<Eigen::Matrix<double, -1, 1>>(vec_stg.data(), vec_stg.size()));
+			return vec;
 		}
 	} // namespace assembler
 } // namespace polyfem

@@ -116,12 +116,6 @@ namespace polyfem
 															lambda_ptr,
 															mu_ptr);
 
-			//			cudaDeviceSynchronize();
-			//			thrust::host_vector<double> energy_stg(energy_dev_storage.begin(), energy_dev_storage.end());
-			//			double init = 0.0;
-
-			//			store_val = thrust::reduce(energy_stg.begin(), energy_stg.end(), init, thrust::plus<double>());
-
 			return store_val;
 		}
 
@@ -139,6 +133,7 @@ namespace polyfem
 			rhs.setZero();
 
 			const int n_bases = int(bases.size());
+
 			Eigen::MatrixXd vec;
 			vec.resize(rhs.size(), 1);
 			vec.setZero();
@@ -162,7 +157,7 @@ namespace polyfem
 
 			for (int e = 0; e < n_bases; ++e)
 			{
-				assert(MAX_QUAD_POINTS == -1 || quadrature.weights.size() < MAX_QUAD_POINTS);
+				//assert(MAX_QUAD_POINTS == -1 || quadrature.weights.size() < MAX_QUAD_POINTS);
 				int N = vals_array[e].det.size();
 				da_host[e].resize(N, 1);
 				da_host[e] = vals_array[e].det.array() * vals_array[e].quadrature.weights.array();
@@ -226,6 +221,135 @@ namespace polyfem
 													 mu_ptr,
 													 n_basis);
 			rhs += vec;
+			return;
+		}
+
+		template <class LocalAssembler>
+		void NLAssembler<LocalAssembler>::assemble_hessian_GPU(
+			const bool is_volume,
+			const int n_basis,
+			const bool project_to_psd,
+			const std::vector<ElementBases> &bases,
+			const std::vector<ElementBases> &gbases,
+			const AssemblyValsCache &cache,
+			const Eigen::MatrixXd &displacement,
+			SpareMatrixCache &mat_cache,
+			StiffnessMatrix &grad,
+			int *outer_index_ptr,
+			int size_outerindex,
+			int *inner_index_ptr,
+			int size_innerindex) const
+		{
+
+			// AFTER CALLED assemble_hessian ONE TIME
+			mat_cache.init(n_basis * local_assembler_.size());
+			mat_cache.set_zero();
+
+			const int n_bases = int(bases.size());
+
+			std::vector<ElementAssemblyValues> vals_array(n_bases);
+
+			for (int e = 0; e < n_bases; ++e)
+			{
+				cache.compute(e, is_volume, bases[e], gbases[e], vals_array[e]);
+			}
+			thrust::device_vector<double> displacement_dev(displacement.col(0).begin(), displacement.col(0).end());
+			int jac_it_N = vals_array[0].jac_it.size();
+
+			thrust::device_vector<Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, 0, 3, 3>> jac_it_dev(n_bases * jac_it_N);
+
+			int basis_values_N = vals_array[0].basis_values.size();
+			int global_columns_N = vals_array[0].basis_values[0].global.size();
+			thrust::device_vector<basis::Local2Global> global_data_dev(n_bases * basis_values_N * global_columns_N);
+
+			thrust::host_vector<Eigen::Matrix<double, -1, 1, 0, 3, 1>> da_host(n_bases);
+
+			for (int e = 0; e < n_bases; ++e)
+			{
+				//assert(MAX_QUAD_POINTS == -1 || quadrature.weights.size() < MAX_QUAD_POINTS);
+				int N = vals_array[e].det.size();
+				da_host[e].resize(N, 1);
+				da_host[e] = vals_array[e].det.array() * vals_array[e].quadrature.weights.array();
+
+				thrust::copy(vals_array[e].jac_it.begin(), vals_array[e].jac_it.end(), jac_it_dev.begin() + e * jac_it_N);
+				for (int f = 0; f < basis_values_N; f++)
+				{
+					//needs a paranoic check
+					thrust::copy(vals_array[e].basis_values[f].global.begin(), vals_array[e].basis_values[f].global.end(), global_data_dev.begin() + e * (basis_values_N * global_columns_N) + f * global_columns_N);
+				}
+			}
+
+			thrust::device_vector<Eigen::Matrix<double, -1, 1, 0, 3, 1>> da_dev(n_bases);
+			thrust::copy(da_host.begin(), da_host.end(), da_dev.begin());
+
+			const int n_pts = da_host[0].size();
+
+			thrust::device_vector<Eigen::Matrix<double, -1, -1, 0, 3, 3>> grad_dev(n_bases * basis_values_N * n_pts);
+			for (int e = 0; e < n_bases; ++e)
+			{
+				for (int f = 0; f < basis_values_N; f++)
+				{
+					for (int p = 0; p < n_pts; p++)
+						grad_dev[e * basis_values_N * n_pts + f * n_pts + p] = vals_array[e].basis_values[f].grad.row(p);
+				}
+			}
+
+			//basis_values_N <--> n_loc_bases
+
+			// extract all lambdas and mus and set to device vector
+			double lambda, mu;
+			thrust::device_vector<double> lambda_array(n_pts);
+			thrust::device_vector<double> mu_array(n_pts);
+			for (int p = 0; p < n_pts; p++)
+			{
+				local_assembler_.get_lambda_mu(vals_array[0].quadrature.points.row(p), vals_array[0].val.row(p), vals_array[0].element_id, lambda, mu);
+				lambda_array[p] = lambda;
+				mu_array[p] = mu;
+			}
+
+			// READY TO SEND ALL TO GPU
+
+			double *displacement_dev_ptr = thrust::raw_pointer_cast(displacement_dev.data());
+
+			Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, 0, 3, 3> *jac_it_dev_ptr = thrust::raw_pointer_cast(jac_it_dev.data());
+			basis::Local2Global *global_data_dev_ptr = thrust::raw_pointer_cast(global_data_dev.data());
+			Eigen::Matrix<double, -1, 1, 0, 3, 1> *da_dev_ptr = thrust::raw_pointer_cast(da_dev.data());
+			Eigen::Matrix<double, -1, -1, 0, 3, 3> *grad_dev_ptr = thrust::raw_pointer_cast(grad_dev.data());
+
+			double *lambda_ptr = thrust::raw_pointer_cast(lambda_array.data());
+			double *mu_ptr = thrust::raw_pointer_cast(mu_array.data());
+
+			//SET UP MOVING VALUES FUNC (INNER AND OUTER INDEX ALREADY SENT TO GPU)
+
+			std::vector<double> computed_values(mat_cache.non_zeros(), 0);
+
+			computed_values = local_assembler_.assemble_hessian_GPU(displacement_dev_ptr,
+																	jac_it_dev_ptr,
+																	global_data_dev_ptr,
+																	da_dev_ptr,
+																	grad_dev_ptr,
+																	n_bases,
+																	basis_values_N,
+																	global_columns_N,
+																	n_pts,
+																	lambda_ptr,
+																	mu_ptr,
+																	n_basis,
+																	outer_index_ptr,
+																	size_outerindex,
+																	inner_index_ptr,
+																	size_innerindex);
+			//computed_values);
+
+			// WE NEED TO GO BACK HERE
+			//if (project_to_psd)
+			//	stiffness_val = ipc::project_to_psd(stiffness_val);
+
+			mat_cache.moving_values(computed_values);
+			//mat_cache.print_values();
+
+			grad = mat_cache.get_matrix();
+			return;
 		}
 
 		//template instantiation

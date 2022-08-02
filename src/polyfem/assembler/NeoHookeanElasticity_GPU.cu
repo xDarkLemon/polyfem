@@ -21,10 +21,7 @@ namespace polyfem
 			else if (mat.rows() == 2)
 				result = mat(0, 0) * mat(1, 1) - mat(0, 1) * mat(1, 0);
 			else if (mat.rows() == 3)
-			{
 				result = mat(0, 0) * (mat(1, 1) * mat(2, 2) - mat(1, 2) * mat(2, 1)) - mat(0, 1) * (mat(1, 0) * mat(2, 2) - mat(1, 2) * mat(2, 0)) + mat(0, 2) * (mat(1, 0) * mat(2, 1) - mat(1, 1) * mat(2, 0));
-				//	printf("result %lf\n", result);
-			}
 			else
 				result = 0;
 			return;
@@ -114,7 +111,7 @@ namespace polyfem
 
 					energy += val * da[b_index](p);
 				}
-
+				// Could do the reduction here
 				energy_storage[b_index] = energy;
 			}
 		}
@@ -133,22 +130,17 @@ namespace polyfem
 															 int size_,
 															 double *lambda,
 															 double *mu,
-															 //													 T *vec)
-															 //													 double *vec)
 															 double *result_vec)
 		{
-
-			//assert(displacement.cols() == 1);
 			Eigen::Matrix<double, -1, -1> vec(N_basis_global * size_, 1);
-			extern __shared__ double shared_vec[];
-			//			double *shared_vec;
-			//			DYNAMIC_GPU_ALLOC(shared_vec, N_basis_global * size_);
-
 			vec.setZero();
+
+			extern __shared__ double shared_vec[];
+
 			int bx = blockIdx.x;
 			int tx = threadIdx.x;
 			int b_index = bx * NUMBER_THREADS + tx;
-			//const int n_pts = da.size();
+
 			if (b_index < N)
 			{
 				Eigen::Matrix<double, n_basis, dim> local_disp(bv_N, size_);
@@ -183,18 +175,6 @@ namespace polyfem
 					//Id + grad d
 					def_grad = local_disp.transpose() * grad * jac_it + Eigen::Matrix<double, dim, dim>::Identity(size_, size_);
 
-					//	printf("%lf %lf %lf jac_it0 %d \n\n", jac_it(0, 0), jac_it(0, 1), jac_it(0, 2), b_index);
-					//	printf("%lf %lf %lf jac_it1 %d \n\n", jac_it(1, 0), jac_it(1, 1), jac_it(1, 2), b_index);
-					//	printf("%lf %lf %lf jac_it2 %d \n\n", jac_it(2, 0), jac_it(2, 1), jac_it(2, 2), b_index);
-					//	printf("%lf %lf %lf def_grad0 %d \n\n", def_grad(0, 0), def_grad(1, 0), def_grad(2, 0), b_index);
-					//	printf("%lf %lf %lf def_grad1 %d \n\n", def_grad(0, 1), def_grad(1, 1), def_grad(2, 1), b_index);
-					//	printf("%lf %lf %lf def_grad2 %d \n\n", def_grad(0, 2), def_grad(1, 2), def_grad(2, 2), b_index);
-					// printf("%lf %lf %lf grad0 %d \n\n", grad[0](0, 0), grad[0](0, 1), grad[0](0, 2), b_index);
-					//	printf("%lf %lf %lf grad1 %d \n\n", grad[0](1, 0), grad[0](1, 1), grad[0](1, 2), b_index);
-					//	printf("%lf %lf %lf grad2 %d \n\n", grad[0](2, 0), grad[0](2, 1), grad[0](2, 2), b_index);
-					//					printf("%lf %lf %lf  local_disp0 %d \n\n", local_disp(0, 0), local_disp(1, 0), local_disp(2, 0), b_index);
-					//			printf("%lf %lf %lf  local_disp1 %d \n\n", local_disp(0, 1), local_disp(1, 1), local_disp(2, 1), b_index);
-					//	printf("%lf %lf %lf  local_disp2 %d \n\n", local_disp(0, 2), local_disp(1, 2), local_disp(2, 2), b_index);
 					double J;
 					kernel_det(def_grad, J);
 					const double log_det_j = log(J);
@@ -242,7 +222,6 @@ namespace polyfem
 				constexpr int N = (n_basis == Eigen::Dynamic) ? Eigen::Dynamic : n_basis * dim;
 				Eigen::Matrix<double, N, 1> temp(Eigen::Map<Eigen::Matrix<double, N, 1>>(G_T.data(), G_T.size()));
 
-				//	vec[b_index] = temp;
 				for (int j = 0; j < bv_N; ++j)
 				{
 					for (int m = 0; m < size_; ++m)
@@ -258,7 +237,6 @@ namespace polyfem
 							const auto gj = global_data[b_index * bv_N * gc_N + j * gc_N + jj].index * size_ + m;
 							const auto wj = global_data[b_index * bv_N * gc_N + j * gc_N + jj].val;
 
-							// DATA RACEEE PSSS
 							vec(gj) += local_value * wj;
 						}
 					}
@@ -267,6 +245,7 @@ namespace polyfem
 				typedef cub::BlockReduce<double, 32> BlockReduce;
 				// Allocate shared memory for BlockReduce
 				__shared__ typename BlockReduce::TempStorage temp_storage;
+
 				for (int i = 0; i < N_basis_global * size_; i++)
 				{
 					double result_ = BlockReduce(temp_storage).Sum(vec(i));
@@ -306,7 +285,6 @@ namespace polyfem
 			return;
 		}
 
-		//template <typename T>
 		Eigen::VectorXd
 		NeoHookeanElasticity::assemble_grad_GPU(double *displacement_dev_ptr,
 												Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, 0, 3, 3> *jac_it_dev_ptr,
@@ -319,7 +297,6 @@ namespace polyfem
 												int n_pts,
 												double *lambda,
 												double *mu,
-												//												double *vec, int n_basis) const
 												int n_basis) const
 		{
 			int grid = (n_bases % NUMBER_THREADS == 0) ? n_bases / NUMBER_THREADS : n_bases / NUMBER_THREADS + 1;
@@ -336,21 +313,6 @@ namespace polyfem
 				Eigen::Matrix<double, -1, 1> gradient(Eigen::Map<Eigen::Matrix<double, -1, 1>>(vec_stg.data(), vec_stg.size()));
 				return gradient;
 			}
-
-			//		template void NeoHookeanElasticity::assemble_grad_GPU<double>(double *,
-			//																	  //	template void NeoHookeanElasticity::assemble_grad_GPU<Eigen::Matrix<double, 12, 1>>(double *,
-			//																	  Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, 0, 3, 3> *,
-			//																	  Local2Global *,
-			//																	  Eigen::Matrix<double, -1, 1, 0, 3, 1> *,
-			//																	  Eigen::Matrix<double, -1, -1, 0, 3, 3> *,
-			//																	  int,
-			//																	  int,
-			//																	  int,
-			//																	  int,
-			//																	  double *,
-			//																	  double *,
-			//																	  //																							Eigen::Matrix<double, 12, 1> *) const;
-			//																	  double *, int n_basis) const;
-		} // namespace assembler
-	}     // namespace assembler
+		}
+	} // namespace assembler
 } // namespace polyfem

@@ -47,7 +47,7 @@ namespace polyfem
 			int basis_values_N = vals_array[0].basis_values.size();
 			int global_columns_N = vals_array[0].basis_values[0].global.size();
 			thrust::device_vector<basis::Local2Global> global_data_dev(n_bases * basis_values_N * global_columns_N);
-			//		printf("%d \n", n_bases * basis_values_N * global_columns_N * sizeof(Local2Global));
+
 			thrust::host_vector<Eigen::Matrix<double, -1, 1, 0, 3, 1>> da_host(n_bases);
 
 			for (int e = 0; e < n_bases; ++e)
@@ -145,18 +145,15 @@ namespace polyfem
 			vec.resize(rhs.size(), 1);
 			vec.setZero();
 
-			//thrust::device_vector<double> vec_dev(rhs.size());
-
 			std::vector<ElementAssemblyValues> vals_array(n_bases);
 
-			//			ElementAssemblyValues &vals = val_dum;
 			for (int e = 0; e < n_bases; ++e)
 			{
 				cache.compute(e, is_volume, bases[e], gbases[e], vals_array[e]);
 			}
 			thrust::device_vector<double> displacement_dev(displacement.col(0).begin(), displacement.col(0).end());
 			int jac_it_N = vals_array[0].jac_it.size();
-			//				const Quadrature &quadrature = vals.quadrature;
+
 			thrust::device_vector<Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, 0, 3, 3>> jac_it_dev(n_bases * jac_it_N);
 
 			int basis_values_N = vals_array[0].basis_values.size();
@@ -175,7 +172,7 @@ namespace polyfem
 				thrust::copy(vals_array[e].jac_it.begin(), vals_array[e].jac_it.end(), jac_it_dev.begin() + e * jac_it_N);
 				for (int f = 0; f < basis_values_N; f++)
 				{
-					//needs to be checked
+					//needs a paranoic check
 					thrust::copy(vals_array[e].basis_values[f].global.begin(), vals_array[e].basis_values[f].global.end(), global_data_dev.begin() + e * (basis_values_N * global_columns_N) + f * global_columns_N);
 				}
 			}
@@ -209,7 +206,7 @@ namespace polyfem
 			// READY TO SEND ALL TO GPU
 
 			double *displacement_dev_ptr = thrust::raw_pointer_cast(displacement_dev.data());
-			//	double *vec_ptr = thrust::raw_pointer_cast(vec_dev.data());
+
 			Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, 0, 3, 3> *jac_it_dev_ptr = thrust::raw_pointer_cast(jac_it_dev.data());
 			basis::Local2Global *global_data_dev_ptr = thrust::raw_pointer_cast(global_data_dev.data());
 			Eigen::Matrix<double, -1, 1, 0, 3, 1> *da_dev_ptr = thrust::raw_pointer_cast(da_dev.data());
@@ -217,14 +214,6 @@ namespace polyfem
 
 			double *lambda_ptr = thrust::raw_pointer_cast(lambda_array.data());
 			double *mu_ptr = thrust::raw_pointer_cast(mu_array.data());
-
-			//double *vec_ptr = thrust::raw_pointer_cast(vec_dev.data());
-			//			assert(local_assembler_.size() == 3);
-			//			if (vals_array[0].basis_values.size() == 4)
-			//			{
-
-			//	thrust::device_vector<Eigen::Matrix<double, 12, 1>> val_gradient_dev(n_bases);
-			//Eigen::Matrix<double, 12, 1> *vec_ptr = thrust::raw_pointer_cast(vec_dev.data());
 
 			vec = local_assembler_.assemble_grad_GPU(displacement_dev_ptr,
 													 jac_it_dev_ptr,
@@ -238,46 +227,7 @@ namespace polyfem
 													 lambda_ptr,
 													 mu_ptr,
 													 n_basis);
-			//											   vec_ptr, n_basis);
-
-			//			  cudaDeviceSynchronize();
-
-			//	thrust::host_vector<Eigen::Matrix<double, 12, 1>> vec_stg(val_gradient_dev.begin(), val_gradient_dev.end());
-			// thrust::host_vector<double> vec_stg(vec_dev.begin(), vec_dev.end());
-
-			//				for (int e = 0; e < n_bases; ++e)
-			//				{
-			//					assert(vals_array[e].size() == basis_values_N * local_assembler_.size());
-			//
-			//					for (int j = 0; j < basis_values_N; ++j)
-			//					{
-			//						const auto &global_j = vals_array[e].basis_values[j].global;
-			//
-			//						// igl::Timer t1; t1.start();
-			//						for (int m = 0; m < local_assembler_.size(); ++m)
-			//						{
-			//							const double local_value = vec_stg[e](j * local_assembler_.size() + m);
-			//							if (std::abs(local_value) < 1e-30)
-			//							{
-			//								continue;
-			//							}
-			//
-			//							for (size_t jj = 0; jj < global_j.size(); ++jj)
-			//							{
-			//								const auto gj = global_j[jj].index * local_assembler_.size() + m;
-			//								const auto wj = global_j[jj].val;
-			//
-			//								vec(gj) += local_value * wj;
-			//							}
-			//						}
-			//					}
-			//				}
-
-			//Eigen::Matrix<double, -1, 1> vec(Eigen::Map<Eigen::Matrix<double, -1, 1>>(vec_stg.data(), vec_stg.size()));
 			rhs += vec;
-			//}
-
-			//	std::cout << rhs << "rhs matrix" << std::endl;
 		}
 
 		//template instantiation

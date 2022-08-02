@@ -104,25 +104,23 @@ namespace polyfem
 			thrust::device_vector<double> energy_dev_storage(n_bases, double(0.0));
 			double *energy_dev_storage_ptr = thrust::raw_pointer_cast(energy_dev_storage.data());
 
-			cudaDeviceSynchronize();
-			local_assembler_.compute_energy_gpu(displacement_dev_ptr,
-												jac_it_dev_ptr,
-												global_data_dev_ptr,
-												da_dev_ptr,
-												grad_dev_ptr,
-												n_bases,
-												basis_values_N,
-												global_columns_N,
-												n_pts,
-												lambda_ptr,
-												mu_ptr,
-												energy_dev_storage_ptr);
+			store_val = local_assembler_.compute_energy_gpu(displacement_dev_ptr,
+															jac_it_dev_ptr,
+															global_data_dev_ptr,
+															da_dev_ptr,
+															grad_dev_ptr,
+															n_bases,
+															basis_values_N,
+															global_columns_N,
+															n_pts,
+															lambda_ptr,
+															mu_ptr);
 
-			cudaDeviceSynchronize();
-			thrust::host_vector<double> energy_stg(energy_dev_storage.begin(), energy_dev_storage.end());
-			double init = 0.0;
+			//			cudaDeviceSynchronize();
+			//			thrust::host_vector<double> energy_stg(energy_dev_storage.begin(), energy_dev_storage.end());
+			//			double init = 0.0;
 
-			store_val = thrust::reduce(energy_stg.begin(), energy_stg.end(), init, thrust::plus<double>());
+			//			store_val = thrust::reduce(energy_stg.begin(), energy_stg.end(), init, thrust::plus<double>());
 
 			return store_val;
 		}

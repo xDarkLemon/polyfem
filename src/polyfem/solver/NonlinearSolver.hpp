@@ -50,6 +50,8 @@ namespace cppoptlib
 			m_line_search = polyfem::solver::line_search::LineSearch<ProblemType>::construct_line_search(line_search_name);
 			solver_info["line_search"] = line_search_name;
 		}
+		
+		void minimize_gpu(ProblemType &objFunc,  Eigen::Matrix<double, -1, 1> &x);
 
 		void minimize(ProblemType &objFunc, TVector &x)
 		{

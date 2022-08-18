@@ -12,6 +12,8 @@
 
 namespace cppoptlib
 {
+	using json = polyfem::json;
+	
 	template <typename ProblemType /*, int Ord*/>
 	class NonlinearSolver : public ISolver<ProblemType, /*Ord=*/-1>
 	{
@@ -62,6 +64,8 @@ namespace cppoptlib
 			// ---------------------------
 
 			reset(objFunc, x); // place for children to initialize their fields
+
+			typedef Eigen::Matrix<double, -1, 1> TVector;
 
 			TVector grad = TVector::Zero(x.rows());
 			TVector delta_x = TVector::Zero(x.rows());

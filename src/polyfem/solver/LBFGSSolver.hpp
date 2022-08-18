@@ -83,6 +83,15 @@ namespace cppoptlib
 			this->descent_strategy = 2;
 		}
 
+		virtual bool compute_update_direction_gpu(
+			ProblemType &objFunc,
+			const Eigen::Matrix<double, -1, 1> &x,
+			const Eigen::Matrix<double, -1, 1> &grad,
+			Eigen::Matrix<double, -1, 1> &direction) override
+		{
+			return true;
+		}
+		
 		virtual bool compute_update_direction(
 			ProblemType &objFunc,
 			const TVector &x,

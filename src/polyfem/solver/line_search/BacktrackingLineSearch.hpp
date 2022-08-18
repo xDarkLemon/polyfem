@@ -90,7 +90,7 @@ namespace polyfem
 
 					{
 						POLYFEM_SCOPED_TIMER("energy min in LS", this->classical_line_search_time);
-						step_size = compute_descent_step_size(x, delta_x, objFunc, old_energy, step_size);
+						step_size = compute_descent_step_size_gpu(x, delta_x, objFunc, old_energy, step_size);
 						if (std::isnan(step_size))
 						{
 							// Superclass::save_sampled_values("failed-line-search-values.csv", x, delta_x, objFunc);
@@ -126,6 +126,13 @@ namespace polyfem
 				}
 
 			protected:
+				double compute_descent_step_size_gpu(
+					const Eigen::Matrix<double, -1, 1> &x,
+					const Eigen::Matrix<double, -1, 1> &delta_x,
+					ProblemType &objFunc,
+					const double old_energy_in,
+					const double starting_step_size = 1);
+				
 				double compute_descent_step_size(
 					const TVector &x,
 					const TVector &delta_x,

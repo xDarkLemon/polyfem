@@ -27,227 +27,249 @@ namespace cppoptlib
     template <typename ProblemType /*, int Ord*/>
     void NonlinearSolver<ProblemType>::minimize_gpu(ProblemType &objFunc, Eigen::Matrix<double, -1, 1> &x)
     {
-			using namespace polyfem;
+       using namespace polyfem;
 
-			// ---------------------------
-			// Initialize the minimization
-			// ---------------------------
+        // ---------------------------
+        // Initialize the minimization
+        // ---------------------------
 
-			reset(objFunc, x); // place for children to initialize their fields
+        reset(objFunc, x); // place for children to initialize their fields
 
-			TVector grad = TVector::Zero(x.rows());
-			TVector delta_x = TVector::Zero(x.rows());
+        Eigen::Matrix<double, -1, 1> grad = Eigen::Matrix<double, -1, 1>::Zero(x.rows());
+        Eigen::Matrix<double, -1, 1> delta_x = Eigen::Matrix<double, -1, 1>::Zero(x.rows());
 
-			// double factor = 1e-5;
+        // TVector grad = TVector::Zero(x.rows());
+        // TVector delta_x = TVector::Zero(x.rows());
 
-			// Set these to nan to indicate they have not been computed yet
-			double old_energy = std::nan("");
+		thrust::host_vector<double> x_host(x.col(0).begin(), x.col(0).end());
+        thrust::host_vector<double> grad_host(grad.col(0).begin(), grad.col(0).end());
+		thrust::host_vector<double> delta_x_host(delta_x.col(0).begin(), delta_x.col(0).end());
 
-			{
-				POLYFEM_SCOPED_TIMER("constraint set update", constraint_set_update_time);
-				objFunc.solution_changed(x);
-			}
+        thrust::device_vector<double> x_dev = x_host;
+        thrust::device_vector<double> grad_dev = grad_host;
+		thrust::device_vector<double> delta_x_dev = delta_x_host;
 
-			{
-				POLYFEM_SCOPED_TIMER("compute gradient", grad_time);
-				objFunc.gradient(x, grad);
-			}
-			double first_grad_norm = grad.norm();
-			if (std::isnan(first_grad_norm))
-			{
-				this->m_status = Status::UserDefined;
-				polyfem::logger().error("[{}] Initial gradient is nan; stopping", name());
-				m_error_code = ErrorCode::NanEncountered;
-				throw std::runtime_error("Gradient is nan; stopping");
-				return;
-			}
-			this->m_current.gradNorm = first_grad_norm / (normalize_gradient ? first_grad_norm : 1);
-			this->m_current.fDelta = old_energy;
+        // double factor = 1e-5;
 
-			this->m_status = checkConvergence(this->m_stop, this->m_current);
-			if (this->m_status != Status::Continue)
-			{
-				POLYFEM_SCOPED_TIMER("compute objective function", obj_fun_time);
-				this->m_current.fDelta = objFunc.value(x);
-				polyfem::logger().log(
-					spdlog::level::info, "[{}] {} (f={} ||∇f||={} g={} tol={})",
-					name(), "Not even starting, grad is small enough", this->m_current.fDelta, first_grad_norm,
-					this->m_current.gradNorm, this->m_stop.gradNorm);
-				update_solver_info();
-				return;
-			}
+        // Set these to nan to indicate they have not been computed yet
+        double old_energy = std::nan("");
 
-			utils::Timer timer("non-linear solver", this->total_time);
-			timer.start();
+        {
+            POLYFEM_SCOPED_TIMER("constraint set update", constraint_set_update_time);
+            objFunc.solution_changed(x);
+        }
 
-			m_line_search->use_grad_norm_tol = use_grad_norm_tol;
+        {
+            POLYFEM_SCOPED_TIMER("compute gradient", grad_time);
+            objFunc.gradient(x, grad);
+        }
+        thrust::copy(grad.begin(), grad.end(), grad_host.begin());
+		thrust::copy(grad_host.begin(), grad_host.end(), grad_dev.begin());
+        double first_grad_norm = std::sqrt(thrust::inner_product(grad_dev.begin(), grad_dev.end(), grad_dev.begin(), 0.0));
+        // double first_grad_norm = grad.norm();
+        
+        if (std::isnan(first_grad_norm))
+        {
+            this->m_status = Status::UserDefined;
+            polyfem::logger().error("[{}] Initial gradient is nan; stopping", name());
+            m_error_code = ErrorCode::NanEncountered;
+            throw std::runtime_error("Gradient is nan; stopping");
+            return;
+        }
+        this->m_current.gradNorm = first_grad_norm / (normalize_gradient ? first_grad_norm : 1);
+        this->m_current.fDelta = old_energy;
 
-			do
-			{
-				{
-					POLYFEM_SCOPED_TIMER("constraint set update", constraint_set_update_time);
-					objFunc.solution_changed(x);
-				}
+        this->m_status = checkConvergence(this->m_stop, this->m_current);
+        if (this->m_status != Status::Continue)
+        {
+            POLYFEM_SCOPED_TIMER("compute objective function", obj_fun_time);
+            this->m_current.fDelta = objFunc.value(x);
+            polyfem::logger().log(
+                spdlog::level::info, "[{}] {} (f={} ||∇f||={} g={} tol={})",
+                name(), "Not even starting, grad is small enough", this->m_current.fDelta, first_grad_norm,
+                this->m_current.gradNorm, this->m_stop.gradNorm);
+            update_solver_info();
+            return;
+        }
 
-				double energy;
-				{
-					POLYFEM_SCOPED_TIMER("compute objective function", obj_fun_time);
-					energy = objFunc.value(x);
-				}
-				if (!std::isfinite(energy))
-				{
-					this->m_status = Status::UserDefined;
-					polyfem::logger().error("[{}] f(x) is nan or inf; stopping", name());
-					m_error_code = ErrorCode::NanEncountered;
-					throw std::runtime_error("f(x) is nan or inf; stopping");
-					break;
-				}
+        utils::Timer timer("non-linear solver", this->total_time);
+        timer.start();
 
-				{
-					POLYFEM_SCOPED_TIMER("compute gradient", grad_time);
-					objFunc.gradient(x, grad);
-				}
+        m_line_search->use_grad_norm_tol = use_grad_norm_tol;
 
-				const double grad_norm = grad.norm();
-				if (std::isnan(grad_norm))
-				{
-					this->m_status = Status::UserDefined;
-					polyfem::logger().error("[{}] Gradient is nan; stopping", name());
-					m_error_code = ErrorCode::NanEncountered;
-					throw std::runtime_error("Gradient is nan; stopping");
-					break;
-				}
+        do
+        {
+            {
+                POLYFEM_SCOPED_TIMER("constraint set update", constraint_set_update_time);
+                objFunc.solution_changed(x);
+            }
 
-				// ------------------------
-				// Compute update direction
-				// ------------------------
+            double energy;
+            {
+                POLYFEM_SCOPED_TIMER("compute objective function", obj_fun_time);
+                energy = objFunc.value(x);
+            }
+            if (!std::isfinite(energy))
+            {
+                this->m_status = Status::UserDefined;
+                polyfem::logger().error("[{}] f(x) is nan or inf; stopping", name());
+                m_error_code = ErrorCode::NanEncountered;
+                throw std::runtime_error("f(x) is nan or inf; stopping");
+                break;
+            }
 
-				// Compute a Δx to update the variable
-				if (!compute_update_direction(objFunc, x, grad, delta_x))
-				{
-					this->m_status = Status::Continue;
-					continue;
-				}
+            {
+                POLYFEM_SCOPED_TIMER("compute gradient", grad_time);
+                objFunc.gradient(x, grad);
+            }
+			thrust::copy(grad.begin(), grad.end(), grad_host.begin());
+			thrust::copy(grad_host.begin(), grad_host.end(), grad_dev.begin());
+            const double grad_norm = std::sqrt(thrust::inner_product(grad_dev.begin(), grad_dev.end(), grad_dev.begin(), 0.0));
+            // const double grad_norm = grad.norm();
+            if (std::isnan(grad_norm))
+            {
+                this->m_status = Status::UserDefined;
+                polyfem::logger().error("[{}] Gradient is nan; stopping", name());
+                m_error_code = ErrorCode::NanEncountered;
+                throw std::runtime_error("Gradient is nan; stopping");
+                break;
+            }
 
-				if (grad_norm != 0 && delta_x.dot(grad) >= 0)
-				{
-					increase_descent_strategy();
-					polyfem::logger().log(
-						spdlog::level::debug,
-						"[{}] direction is not a descent direction (Δx⋅g={}≥0); reverting to {}",
-						name(), delta_x.dot(grad), descent_strategy_name());
-					this->m_status = Status::Continue;
-					continue;
-				}
+            // ------------------------
+            // Compute update direction
+            // ------------------------
 
-				const double delta_x_norm = delta_x.norm();
-				if (std::isnan(delta_x_norm))
-				{
-					increase_descent_strategy();
-					this->m_status = Status::UserDefined;
-					polyfem::logger().debug("[{}] Δx is nan; reverting to {}", name(), descent_strategy_name());
-					this->m_status = Status::Continue;
-					continue;
-				}
+            // Compute a Δx to update the variable
+            if (!compute_update_direction_gpu(objFunc, x, grad, delta_x))
+            {
+                this->m_status = Status::Continue;
+                continue;
+            }
 
-				if (!use_gradient_norm)
-				{
-					//TODO, we shold remove this
-					// Use the maximum absolute displacement value divided by the timestep,
-					// so the units are in velocity units.
-					// TODO: Set this to the actual timestep
-					double dt = 1;
-					// TODO: Also divide by the world scale to make this criteria scale invariant.
-					this->m_current.gradNorm = delta_x.template lpNorm<Eigen::Infinity>() / dt;
-				}
-				else
-				{
-					//if normalize_gradient, use relative to first norm
-					this->m_current.gradNorm = grad_norm / (normalize_gradient ? first_grad_norm : 1);
-				}
-				this->m_current.fDelta = std::abs(old_energy - energy); // / std::abs(old_energy);
+            if (grad_norm != 0 && delta_x.dot(grad) >= 0)
+            {
+                increase_descent_strategy();
+                polyfem::logger().log(
+                    spdlog::level::debug,
+                    "[{}] direction is not a descent direction (Δx⋅g={}≥0); reverting to {}",
+                    name(), delta_x.dot(grad), descent_strategy_name());
+                this->m_status = Status::Continue;
+                continue;
+            }
+            
+            thrust::copy(delta_x.begin(), delta_x.end(), delta_x_host.begin());
+			thrust::copy(delta_x_host.begin(), delta_x_host.end(), delta_x_dev.begin());
+            const double delta_x_norm = std::sqrt(thrust::inner_product(delta_x_dev.begin(), delta_x_dev.end(), delta_x_dev.begin(), 0.0));
+            // const double delta_x_norm = delta_x.norm();
+            if (std::isnan(delta_x_norm))
+            {
+                increase_descent_strategy();
+                this->m_status = Status::UserDefined;
+                polyfem::logger().debug("[{}] Δx is nan; reverting to {}", name(), descent_strategy_name());
+                this->m_status = Status::Continue;
+                continue;
+            }
 
-				this->m_status = checkConvergence(this->m_stop, this->m_current);
+            if (!use_gradient_norm)
+            {
+                //TODO, we shold remove this
+                // Use the maximum absolute displacement value divided by the timestep,
+                // so the units are in velocity units.
+                // TODO: Set this to the actual timestep
+                double dt = 1;
+                // TODO: Also divide by the world scale to make this criteria scale invariant.
+                this->m_current.gradNorm = delta_x.template lpNorm<Eigen::Infinity>() / dt;
+            }
+            else
+            {
+                //if normalize_gradient, use relative to first norm
+                this->m_current.gradNorm = grad_norm / (normalize_gradient ? first_grad_norm : 1);
+            }
+            this->m_current.fDelta = std::abs(old_energy - energy); // / std::abs(old_energy);
 
-				old_energy = energy;
+            this->m_status = checkConvergence(this->m_stop, this->m_current);
 
-				// ---------------
-				// Variable update
-				// ---------------
+            old_energy = energy;
 
-				// Perform a line_search to compute step scale
-				double rate = line_search(x, delta_x, objFunc);
-				if (std::isnan(rate))
-				{
-					// descent_strategy set by line_search upon failure
-					if (this->m_status == Status::Continue)
-						continue;
-					else
-						break;
-				}
+            // ---------------
+            // Variable update
+            // ---------------
 
-				x += rate * delta_x;
+            // Perform a line_search to compute step scale
+            double rate = line_search(x, delta_x, objFunc);
+            if (std::isnan(rate))
+            {
+                // descent_strategy set by line_search upon failure
+                if (this->m_status == Status::Continue)
+                    continue;
+                else
+                    break;
+            }
 
-				// -----------
-				// Post update
-				// -----------
+            x += rate * delta_x;
 
-				descent_strategy = default_descent_strategy(); // Reset this for the next iterations
+            // -----------
+            // Post update
+            // -----------
 
-				const double step = (rate * delta_x).norm();
+            descent_strategy = default_descent_strategy(); // Reset this for the next iterations
+            
+            
+            // const double step = std::sqrt(thrust::inner_product(grad.begin(), grad.end(), grad.begin(), 0.0));
+            const double step = (rate * delta_x).norm();
 
-				if (objFunc.stop(x))
-				{
-					this->m_status = Status::UserDefined;
-					m_error_code = ErrorCode::Success;
-					polyfem::logger().debug("[{}] Objective decided to stop", name());
-				}
+            if (objFunc.stop(x))
+            {
+                this->m_status = Status::UserDefined;
+                m_error_code = ErrorCode::Success;
+                polyfem::logger().debug("[{}] Objective decided to stop", name());
+            }
 
-				objFunc.post_step(this->m_current.iterations, x);
+            objFunc.post_step(this->m_current.iterations, x);
 
-				polyfem::logger().debug(
-					"[{}] iter={:} f={} ‖∇f‖={} ‖Δx‖={} Δx⋅∇f(x)={} g={} tol={} rate={} ‖step‖={}",
-					name(), this->m_current.iterations, energy, grad_norm, delta_x_norm, delta_x.dot(grad),
-					this->m_current.gradNorm, this->m_stop.gradNorm, rate, step);
-				++this->m_current.iterations;
-			} while (objFunc.callback(this->m_current, x) && (this->m_status == Status::Continue));
+            polyfem::logger().debug(
+                "[{}] iter={:} f={} ‖∇f‖={} ‖Δx‖={} Δx⋅∇f(x)={} g={} tol={} rate={} ‖step‖={}",
+                name(), this->m_current.iterations, energy, grad_norm, delta_x_norm, delta_x.dot(grad),
+                this->m_current.gradNorm, this->m_stop.gradNorm, rate, step);
+            ++this->m_current.iterations;
+        } while (objFunc.callback(this->m_current, x) && (this->m_status == Status::Continue));
 
-			timer.stop();
+        timer.stop();
 
-			// -----------
-			// Log results
-			// -----------
+        // -----------
+        // Log results
+        // -----------
 
-			std::string msg = "Finished";
-			spdlog::level::level_enum level = spdlog::level::info;
-			if (this->m_status == Status::IterationLimit)
-			{
-				const std::string msg = fmt::format("[{}] Reached iteration limit", name());
-				polyfem::logger().error(msg);
-				throw std::runtime_error(msg);
-				level = spdlog::level::err;
-			}
-			else if (this->m_current.iterations == 0)
-			{
-				const std::string msg = fmt::format("[{}] Unable to take a step", name());
-				polyfem::logger().error(msg);
-				throw std::runtime_error(msg);
-				level = this->m_status == Status::UserDefined ? spdlog::level::err : spdlog::level::warn;
-			}
-			else if (this->m_status == Status::UserDefined)
-			{
-				const std::string msg = fmt::format("[{}] Failed to find minimizer", name());
-				polyfem::logger().error(msg);
-				throw std::runtime_error(msg);
-				level = spdlog::level::err;
-			}
-			polyfem::logger().log(
-				level, "[{}] {}, took {}s (niters={} f={} ||∇f||={} ||Δx||={} Δx⋅∇f(x)={} g={} tol={})",
-				name(), msg, timer.getElapsedTimeInSec(), this->m_current.iterations, old_energy, grad.norm(), delta_x.norm(),
-				delta_x.dot(grad), this->m_current.gradNorm, this->m_stop.gradNorm);
+        std::string msg = "Finished";
+        spdlog::level::level_enum level = spdlog::level::info;
+        if (this->m_status == Status::IterationLimit)
+        {
+            const std::string msg = fmt::format("[{}] Reached iteration limit", name());
+            polyfem::logger().error(msg);
+            throw std::runtime_error(msg);
+            level = spdlog::level::err;
+        }
+        else if (this->m_current.iterations == 0)
+        {
+            const std::string msg = fmt::format("[{}] Unable to take a step", name());
+            polyfem::logger().error(msg);
+            throw std::runtime_error(msg);
+            level = this->m_status == Status::UserDefined ? spdlog::level::err : spdlog::level::warn;
+        }
+        else if (this->m_status == Status::UserDefined)
+        {
+            const std::string msg = fmt::format("[{}] Failed to find minimizer", name());
+            polyfem::logger().error(msg);
+            throw std::runtime_error(msg);
+            level = spdlog::level::err;
+        }
+        polyfem::logger().log(
+            level, "[{}] {}, took {}s (niters={} f={} ||∇f||={} ||Δx||={} Δx⋅∇f(x)={} g={} tol={})",
+            name(), msg, timer.getElapsedTimeInSec(), this->m_current.iterations, old_energy, grad.norm(), delta_x.norm(),
+            delta_x.dot(grad), this->m_current.gradNorm, this->m_stop.gradNorm);
 
-			log_times();
-			update_solver_info();
+        log_times();
+        update_solver_info();
     }
     template class NonlinearSolver<polyfem::solver::NLProblem>;
 }

@@ -85,6 +85,21 @@ namespace cppoptlib
 			linear_solver->setParameters(this->solver_params);
 		}
 
+		bool compute_update_direction_cuda(
+			ProblemType &objFunc,
+			const Eigen::Matrix<double, -1, 1> &x,
+			const Eigen::Matrix<double, -1, 1> &grad,
+			Eigen::Matrix<double, -1, 1> &direction);
+
+		virtual bool compute_update_direction_gpu(
+			ProblemType &objFunc,
+			const Eigen::Matrix<double, -1, 1> &x,
+			const Eigen::Matrix<double, -1, 1> &grad,
+			Eigen::Matrix<double, -1, 1> &direction) override
+		{
+			return compute_update_direction_cuda(objFunc, x, grad, direction);
+		}
+		
 		virtual bool compute_update_direction(
 			ProblemType &objFunc,
 			const TVector &x,

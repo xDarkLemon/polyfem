@@ -324,6 +324,7 @@ namespace cppoptlib
 		}
 
 		// Compute the search/update direction
+		virtual bool compute_update_direction_gpu(ProblemType &objFunc, const Eigen::Matrix<double, -1, 1> &x_vec, const Eigen::Matrix<double, -1, 1> &grad, Eigen::Matrix<double, -1, 1> &direction) = 0;
 		virtual bool compute_update_direction(ProblemType &objFunc, const TVector &x_vec, const TVector &grad, TVector &direction) = 0;
 
 	protected:

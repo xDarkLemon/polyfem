@@ -43,6 +43,10 @@ endif()
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/recipes/")
 
+#SETTING OPT 0 compiler flag for DEBUG mode
+string(REGEX REPLACE "(\-O[011123456789])" "" CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG}")
+set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -O0")
+
 # Color output
 include(UseColors)
 
@@ -362,6 +366,9 @@ else()
 endif()
 
 set_target_properties(polyfem PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
+#SETTING OPT 0 compiler flag for DEBUG mode
+string(REGEX REPLACE "(\-O[011123456789])" "" CMAKE_CUDA_FLAGS_DEBUG "${CMAKE_CUDA_FLAGS_DEBUG}")
+set(CMAKE_CUDA_FLAGS_DEBUG "${CMAKE_CUDA_FLAGS_DEBUG} -O0 -G")
 
 # foreach(flag IN LISTS ${CXX17_FEATURES})
 # add_compile_options("$<$<COMPILE_LANGUAGE:CUDA>:--compiler-options=${flag}>")

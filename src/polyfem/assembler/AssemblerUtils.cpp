@@ -1,6 +1,8 @@
 #include <polyfem/assembler/AssemblerUtils.hpp>
 #include <polyfem/utils/Logger.hpp>
-
+#include <thrust/device_vector.h>
+#include <thrust/copy.h>
+#include <thrust/host_vector.h>
 #include <unsupported/Eigen/SparseExtra>
 
 namespace polyfem
@@ -178,8 +180,16 @@ namespace polyfem
 		{
 			if (assembler == "SaintVenant")
 				return saint_venant_elasticity_.assemble(is_volume, bases, gbases, cache, displacement);
-			else if (assembler == "NeoHookean")
+#ifdef USE_GPU
+			else if (assembler == "NeoHookean"){
 				return neo_hookean_elasticity_.assemble(is_volume, bases, gbases, cache, displacement);
+			//	return neo_hookean_elasticity_.assemble_GPU(is_volume, bases, gbases, cache, displacement);
+			}
+#endif
+#ifndef USE_GPU
+		else if (assembler == "NeoHookean"){
+			return neo_hookean_elasticity_.assemble(is_volume, bases, gbases, cache, displacement);}
+#endif
 			else if (assembler == "MultiModels")
 				return multi_models_elasticity_.assemble(is_volume, bases, gbases, cache, displacement);
 
@@ -204,11 +214,12 @@ namespace polyfem
 				saint_venant_elasticity_.assemble_grad(is_volume, n_basis, bases, gbases, cache, displacement, grad);
 #ifdef USE_GPU
 			else if (assembler == "NeoHookean")
-				neo_hookean_elasticity_.assemble_grad_GPU(is_volume, n_basis, bases, gbases, cache, displacement, grad);
+				neo_hookean_elasticity_.assemble_grad(is_volume, n_basis, bases, gbases, cache, displacement, grad);
+				//neo_hookean_elasticity_.assemble_grad_GPU(is_volume, n_basis, bases, gbases, cache, displacement, grad);
 #endif
 #ifndef USE_GPU
-		else if (assembler == "NeoHookean"){
-			return neo_hookean_elasticity_.assemble_grad(is_volume, n_basis, bases, gbases, cache, displacement, grad);}
+			else if (assembler == "NeoHookean"){
+			neo_hookean_elasticity_.assemble_grad(is_volume, n_basis, bases, gbases, cache, displacement, grad);}
 #endif
 			else if (assembler == "MultiModels")
 				multi_models_elasticity_.assemble_grad(is_volume, n_basis, bases, gbases, cache, displacement, grad);
@@ -236,8 +247,37 @@ namespace polyfem
 		{
 			if (assembler == "SaintVenant")
 				saint_venant_elasticity_.assemble_hessian(is_volume, n_basis, project_to_psd, bases, gbases, cache, displacement, mat_cache, hessian);
+#ifdef USE_GPU
+			else if (assembler == "NeoHookean"){
+				static int* outer_index_ptr = nullptr;
+				static int* inner_index_ptr = nullptr;
+				static int flag_cache_compute = 0;
+				static int size_outerindex = 0;
+				static int size_innerindex = 0;
+				if(!flag_cache_compute){
+					neo_hookean_elasticity_.assemble_hessian(is_volume, n_basis, project_to_psd, bases, gbases, cache, displacement, mat_cache, hessian);
+					auto outer_ = mat_cache.outer_index_to_gpu();
+					auto inner_ = mat_cache.inner_index_to_gpu();
+					size_outerindex = outer_.size();
+					size_innerindex = inner_.size();
+
+					// NEEDS TO BE FREED
+					outer_index_ptr = ALLOCATE_GPU(outer_index_ptr, sizeof(int)*size_outerindex);
+					inner_index_ptr = ALLOCATE_GPU(inner_index_ptr, sizeof(int)*size_innerindex);
+
+					COPYDATATOGPU(outer_index_ptr, outer_.data(), sizeof(int)*size_outerindex);
+					COPYDATATOGPU(inner_index_ptr, inner_.data(), sizeof(int)*size_innerindex);
+
+					flag_cache_compute++;
+				}
+
+				neo_hookean_elasticity_.assemble_hessian_GPU(is_volume, n_basis, project_to_psd, bases, gbases, cache, displacement, mat_cache, hessian, outer_index_ptr, size_outerindex, inner_index_ptr, size_innerindex);
+			}
+#endif
+#ifndef USE_GPU
 			else if (assembler == "NeoHookean")
 				neo_hookean_elasticity_.assemble_hessian(is_volume, n_basis, project_to_psd, bases, gbases, cache, displacement, mat_cache, hessian);
+#endif
 			else if (assembler == "MultiModels")
 				multi_models_elasticity_.assemble_hessian(is_volume, n_basis, project_to_psd, bases, gbases, cache, displacement, mat_cache, hessian);
 

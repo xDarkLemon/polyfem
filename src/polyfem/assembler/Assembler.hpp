@@ -102,6 +102,21 @@ namespace polyfem
 				utils::SpareMatrixCache &mat_cache,
 				StiffnessMatrix &grad) const;
 
+			void assemble_hessian_GPU(
+				const bool is_volume,
+				const int n_basis,
+				const bool project_to_psd,
+				const std::vector<basis::ElementBases> &bases,
+				const std::vector<basis::ElementBases> &gbases,
+				const AssemblyValsCache &cache,
+				const Eigen::MatrixXd &displacement,
+				utils::SpareMatrixCache &mat_cache,
+				StiffnessMatrix &grad,
+				int *outer_ptr,
+				int size_outer,
+				int *inner_ptr,
+				int size_inner) const;
+
 			//assemble energy
 			double assemble(
 				const bool is_volume,

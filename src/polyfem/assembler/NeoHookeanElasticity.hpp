@@ -30,6 +30,25 @@ namespace polyfem
 
 			//energy, gradient, and hessian used in newton method
 			Eigen::MatrixXd assemble_hessian(const ElementAssemblyValues &vals, const Eigen::MatrixXd &displacement, const QuadratureVector &da) const;
+
+			std::vector<double> assemble_hessian_GPU(double *displacement_dev_ptr,
+													 Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, 0, 3, 3> *jac_it_dev_ptr,
+													 basis::Local2Global *global_data_dev_ptr,
+													 Eigen::Matrix<double, -1, 1, 0, 3, 1> *da_dev_ptr,
+													 Eigen::Matrix<double, -1, -1, 0, 3, 3> *grad_dev_ptr,
+													 int n_bases,
+													 int basis_values_N,
+													 int global_columns_N,
+													 int n_pts,
+													 double *lambda_ptr,
+													 double *mu_ptr,
+													 int n_basis,
+													 int *outer_index,
+													 int size_outer,
+													 int *inner_index,
+													 int size_inner) const;
+			//std::vector<double> &computed_values) const;
+
 			Eigen::VectorXd assemble_grad(const ElementAssemblyValues &vals, const Eigen::MatrixXd &displacement, const QuadratureVector &da) const;
 
 			//			template <typename T>
@@ -48,6 +67,8 @@ namespace polyfem
 											  int n_basis) const;
 
 			double compute_energy(const ElementAssemblyValues &vals, const Eigen::MatrixXd &displacement, const QuadratureVector &da) const;
+
+			void print_test_wrapper(int *outer, int n_outer, int *inner, int n_inner) const;
 
 			int compute_energy_gpu(double *displacement_dev_ptr,
 								   Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, 0, 3, 3> *jac_it_dev_ptr,

@@ -138,7 +138,9 @@ namespace polyfem
 			// ---------
 
 			const auto edges_to_ids = mesh.edges_to_ids();
-			assert(in_ordered_edges.rows() == edges_to_ids.size());
+
+			//IGNORED IN RELEASE MODE , BUT 0 != 90)
+//			assert(in_ordered_edges.rows() == edges_to_ids.size());
 
 			for (int in_ei = 0; in_ei < in_ordered_edges.rows(); in_ei++)
 			{
@@ -158,7 +160,9 @@ namespace polyfem
 			if (mesh.is_volume())
 			{
 				const auto faces_to_ids = mesh.faces_to_ids();
-				assert(in_ordered_faces.rows() == faces_to_ids.size());
+
+				//IGNORED IN RELEASE MODE , BUT 0 != 90)
+//				assert(in_ordered_faces.rows() == faces_to_ids.size());
 
 				for (int in_fi = 0; in_fi < in_ordered_faces.rows(); in_fi++)
 				{

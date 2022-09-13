@@ -70,6 +70,7 @@ namespace polyfem
 			void init(const SpareMatrixCache &other);
 
 			void set_zero();
+			void moving_values(std::vector<double> &new_values);
 
 			inline void reserve(const size_t size) { entries_.reserve(size); }
 			inline size_t entries_size() const { return entries_.size(); }
@@ -78,6 +79,15 @@ namespace polyfem
 			inline size_t mapping_size() const { return mapping_.size(); }
 
 			void add_value(const int e, const int i, const int j, const double value);
+
+			void print_entries();
+			void print_oindex();
+			void print_iindex();
+			void print_matrix();
+			void print_values();
+			void print_mapping();
+			void print_second_cache();
+
 			StiffnessMatrix get_matrix(const bool compute_mapping = true);
 			void prune();
 
@@ -87,17 +97,20 @@ namespace polyfem
 			const StiffnessMatrix &mat() const { return mat_; }
 			const std::vector<Eigen::Triplet<double>> &entries() const { return entries_; }
 
+			const std::vector<int> &inner_index_to_gpu() const { return inner_index_; }
+			const std::vector<int> &outer_index_to_gpu() const { return outer_index_; }
+
 		private:
 			size_t size_;
 			StiffnessMatrix tmp_, mat_;
-			std::vector<Eigen::Triplet<double>> entries_;
-			std::vector<std::vector<std::pair<int, size_t>>> mapping_;
-			std::vector<int> inner_index_, outer_index_;
-			std::vector<double> values_;
+			std::vector<Eigen::Triplet<double>> entries_;              // ONLY EXISTS FOR ONE TIME AND BELONGS HERE NOT TO THE MAIN CACHE
+			std::vector<std::vector<std::pair<int, size_t>>> mapping_; // NOT aVAILABLE 1 TIME, MAPPING BELONGS TO MAT_CACHE (MAIN_CACHE)
+			std::vector<int> inner_index_, outer_index_;               //NOT AVAILABLE 1 TIME, OUTER AND INnER INDEX BELONGS TO MAT_CACHE (MAIN_CACHE)
+			std::vector<double> values_;                               // NOT AVAILABLE 1 TIME, VALUES BELONGS TO LOCAL_STORAGE.CACHE
 			const SpareMatrixCache *main_cache_ = nullptr;
 
-			std::vector<std::vector<int>> second_cache_;
-			std::vector<std::vector<std::pair<int, int>>> second_cache_entries_;
+			std::vector<std::vector<int>> second_cache_;                         // NOT AVAILABLE 1 TIME, BUT THEN EXISTS ON THE MAIN CACHE
+			std::vector<std::vector<std::pair<int, int>>> second_cache_entries_; // ONLY EXISTS FOR ONE TIME AND BELONGS HERE NOT TO THE MAIN CACHE
 			bool use_second_cache_ = true;
 			int current_e_ = -1;
 			int current_e_index_ = -1;

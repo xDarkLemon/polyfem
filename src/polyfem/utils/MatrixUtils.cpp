@@ -282,6 +282,81 @@ void polyfem::utils::SpareMatrixCache::set_zero()
 	std::fill(values_.begin(), values_.end(), 0);
 }
 
+void polyfem::utils::SpareMatrixCache::moving_values(std::vector<double>& new_values)
+{
+	values_.insert(values_.begin(), std::make_move_iterator(new_values.begin()), 
+                    std::make_move_iterator(new_values.end()));
+	new_values.erase(new_values.begin() , new_values.end());
+}
+
+void polyfem::utils::SpareMatrixCache::print_entries()
+{
+	int size_entries = entries_.size();
+	for(int i =0 ; i<size_entries; i++){
+          std::cout << entries_[i].row() << "\t"; // row index
+            std::cout << entries_[i].col() << "\t"; // col index (here it is equal to k)
+            std::cout <<entries_[i].value() << std::endl;
+	}
+}
+
+void polyfem::utils::SpareMatrixCache::print_mapping()
+{
+	int row_entries = main_cache_->mapping_.size();
+	printf("%d size row\n", row_entries);
+	for(int i =0 ; i<row_entries; i++){
+		int col_entries = main_cache_->mapping_[i].size();
+
+		printf("%d size col\n", col_entries);
+		for( int j= 0 ; j<col_entries; j++){
+          std::cout << main_cache_->mapping_[i][j].first << "\t"; // row index
+          std::cout << main_cache_->mapping_[i][j].second << std::endl; // row index
+		}
+	}
+}
+void polyfem::utils::SpareMatrixCache::print_second_cache()
+{
+	int row_entries = main_cache_->second_cache_.size();
+	printf("%d size row\n", row_entries);
+	for(int i =0 ; i<row_entries; i++){
+		int col_entries = main_cache_->second_cache_[i].size();
+
+		printf("%d size col\n", col_entries);
+		for( int j= 0 ; j<col_entries; j++){
+          std::cout << main_cache_->second_cache_[i][j] << "\t"; // row index
+		}
+	}
+	printf("\n");
+}
+void polyfem::utils::SpareMatrixCache::print_values()
+{
+	int size_values = values_.size();
+	for(int i =0 ; i<size_values; i++){
+          std::cout << values_[i] << " "; 
+	}
+    std::cout << std::endl; 
+}
+void polyfem::utils::SpareMatrixCache::print_oindex()
+{
+	int size_values = inner_index_.size();
+	for(int i =0 ; i<size_values; i++){
+          std::cout << inner_index_[i] << " "; 
+	}
+
+}
+
+void polyfem::utils::SpareMatrixCache::print_iindex()
+{
+	int size_values = outer_index_.size();
+	for(int i =0 ; i<size_values; i++){
+          std::cout << outer_index_[i] << " "; 
+	}
+
+}
+void polyfem::utils::SpareMatrixCache::print_matrix()
+{
+            std::cout << mat_ << std::endl;
+}
+
 void polyfem::utils::SpareMatrixCache::add_value(const int e, const int i, const int j, const double value)
 {
 	if (mapping().empty())
@@ -290,6 +365,7 @@ void polyfem::utils::SpareMatrixCache::add_value(const int e, const int i, const
 		if (second_cache_entries_.size() <= e)
 			second_cache_entries_.resize(e + 1);
 		second_cache_entries_[e].emplace_back(i, j);
+		//ONE TIME
 	}
 	else
 	{
@@ -303,6 +379,7 @@ void polyfem::utils::SpareMatrixCache::add_value(const int e, const int i, const
 
 			values_[second_cache()[e][current_e_index_]] += value;
 			current_e_index_++;
+
 		}
 		else
 		{
@@ -320,6 +397,7 @@ void polyfem::utils::SpareMatrixCache::add_value(const int e, const int i, const
 				}
 			}
 			assert(found);
+
 		}
 	}
 }
@@ -350,6 +428,7 @@ polyfem::StiffnessMatrix polyfem::utils::SpareMatrixCache::get_matrix(const bool
 	{
 		if (compute_mapping && size_ > 0)
 		{
+			// ONE TIME
 			assert(main_cache_ == nullptr);
 
 			values_.resize(mat_.nonZeros());
@@ -425,7 +504,7 @@ polyfem::StiffnessMatrix polyfem::utils::SpareMatrixCache::get_matrix(const bool
 		{
 			current_e_ = -1;
 			current_e_index_ = -1;
-
+			//Currently used for initial example
 			logger().trace("Using second cache");
 		}
 		else
@@ -441,6 +520,7 @@ polyfem::utils::SpareMatrixCache polyfem::utils::SpareMatrixCache::operator+(con
 
 	if (a.mapping().empty() || mapping().empty())
 	{
+		// ONE TIME
 		out.mat_ = a.mat_ + mat_;
 		if (use_second_cache_)
 		{
@@ -463,9 +543,11 @@ polyfem::utils::SpareMatrixCache polyfem::utils::SpareMatrixCache::operator+(con
 					out.second_cache_entries_[e].insert(out.second_cache_entries_[e].end(), a.second_cache_entries_[e].begin(), a.second_cache_entries_[e].end());
 			}
 		}
+
 	}
 	else
 	{
+		// CONTINUES
 		const auto &outer_index = main_cache_ == nullptr ? outer_index_ : main_cache_->outer_index_;
 		const auto &inner_index = main_cache_ == nullptr ? inner_index_ : main_cache_->inner_index_;
 		const auto &aouter_index = a.main_cache_ == nullptr ? a.outer_index_ : a.main_cache_->outer_index_;
@@ -490,7 +572,7 @@ void polyfem::utils::SpareMatrixCache::operator+=(const SpareMatrixCache &o)
 	if (mapping().empty() || o.mapping().empty())
 	{
 		mat_ += o.mat_;
-
+		//ONE TIME
 		if (use_second_cache_)
 		{
 			const size_t this_e_size = second_cache_entries_.size();
@@ -503,6 +585,7 @@ void polyfem::utils::SpareMatrixCache::operator+=(const SpareMatrixCache &o)
 				second_cache_entries_[e].insert(second_cache_entries_[e].end(), o.second_cache_entries_[e].begin(), o.second_cache_entries_[e].end());
 			}
 		}
+
 	}
 	else
 	{
@@ -514,6 +597,7 @@ void polyfem::utils::SpareMatrixCache::operator+=(const SpareMatrixCache &o)
 		assert(outer_index.size() == oouter_index.size());
 		assert(values_.size() == o.values_.size());
 
+		// CONTINUES
 		maybe_parallel_for(o.values_.size(), [&](int start, int end, int thread_id) {
 			for (int i = start; i < end; ++i)
 			{

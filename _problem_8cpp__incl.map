@@ -1,0 +1,52 @@
+<map id="src/polyfem/assembler/Problem.cpp" name="src/polyfem/assembler/Problem.cpp">
+<area shape="rect" id="node1" title=" " alt="" coords="21,5,192,47"/>
+<area shape="rect" id="node2" href="$_problem_8hpp.html" title=" " alt="" coords="315,95,419,121"/>
+<area shape="rect" id="node17" title=" " alt="" coords="515,743,595,770"/>
+<area shape="rect" id="node25" title=" " alt="" coords="693,743,771,770"/>
+<area shape="rect" id="node3" href="$_assembler_utils_8hpp.html" title=" " alt="" coords="2816,169,2965,196"/>
+<area shape="rect" id="node4" href="$_common_8hpp.html" title=" " alt="" coords="3439,743,3606,770"/>
+<area shape="rect" id="node12" title=" " alt="" coords="2649,915,2751,941"/>
+<area shape="rect" id="node16" title=" " alt="" coords="1461,833,1523,859"/>
+<area shape="rect" id="node18" href="$_element_bases_8hpp.html" title=" " alt="" coords="2451,572,2690,599"/>
+<area shape="rect" id="node19" href="$_mesh_8hpp.html" title=" " alt="" coords="1069,654,1251,681"/>
+<area shape="rect" id="node49" href="$_local_boundary_8hpp.html" title=" " alt="" coords="245,401,488,427"/>
+<area shape="rect" id="node7" href="$_assembler_8hpp.html" title=" " alt="" coords="1469,319,1587,345"/>
+<area shape="rect" id="node26" href="$_matrix_utils_8hpp.html" title=" " alt="" coords="2962,743,3174,770"/>
+<area shape="rect" id="node28" href="$_mass_matrix_assembler_8hpp.html" title=" " alt="" coords="1021,319,1216,345"/>
+<area shape="rect" id="node32" href="$_laplacian_8hpp.html" title=" " alt="" coords="5177,401,5289,427"/>
+<area shape="rect" id="node33" href="$_bilaplacian_8hpp.html" title=" " alt="" coords="923,401,1045,427"/>
+<area shape="rect" id="node34" href="$_helmholtz_8hpp.html" title=" " alt="" coords="3712,401,3829,427"/>
+<area shape="rect" id="node35" href="$_linear_elasticity_8hpp.html" title=" " alt="" coords="2034,319,2182,345"/>
+<area shape="rect" id="node36" href="$_hooke_linear_elasticity_8hpp.html" title=" " alt="" coords="2309,319,2499,345"/>
+<area shape="rect" id="node37" href="$_saint_venant_elasticity_8hpp.html" title=" " alt="" coords="2797,319,2984,345"/>
+<area shape="rect" id="node38" href="$_neo_hookean_elasticity_8hpp.html" title=" " alt="" coords="4109,319,4299,345"/>
+<area shape="rect" id="node45" href="$_multi_model_8hpp.html" title=" " alt="" coords="3184,244,3307,271"/>
+<area shape="rect" id="node46" href="$_stokes_8hpp.html" title=" " alt="" coords="3493,401,3587,427"/>
+<area shape="rect" id="node47" href="$_navier_stokes_8hpp.html" title=" " alt="" coords="3333,401,3469,427"/>
+<area shape="rect" id="node48" href="$_incompressible_lin_elast_8hpp.html" title=" " alt="" coords="1721,319,1921,345"/>
+<area shape="rect" id="node5" title=" " alt="" coords="2517,915,2624,941"/>
+<area shape="rect" id="node6" title=" " alt="" coords="3339,833,3485,859"/>
+<area shape="rect" id="node8" href="$_assembly_vals_cache_8hpp.html" title=" " alt="" coords="1309,401,1491,427"/>
+<area shape="rect" id="node9" href="$_element_assembly_values_8hpp.html" title=" " alt="" coords="2467,483,2674,524"/>
+<area shape="rect" id="node27" title=" " alt="" coords="1121,401,1183,427"/>
+<area shape="rect" id="node10" href="$_assembly_values_8hpp.html" title=" " alt="" coords="2108,647,2324,688"/>
+<area shape="rect" id="node11" href="$_quadrature_8hpp.html" title=" " alt="" coords="2558,825,2709,867"/>
+<area shape="rect" id="node13" href="$_basis_8hpp.html" title=" " alt="" coords="2295,743,2476,770"/>
+<area shape="rect" id="node14" href="$_types_8hpp.html" title=" " alt="" coords="2802,833,2979,859"/>
+<area shape="rect" id="node15" title=" " alt="" coords="1946,833,2033,859"/>
+<area shape="rect" id="node20" href="$_navigation_8hpp.html" title=" " alt="" coords="947,736,1122,777"/>
+<area shape="rect" id="node21" title=" " alt="" coords="897,833,1069,859"/>
+<area shape="rect" id="node23" href="$_hash_utils_8hpp.html" title=" " alt="" coords="1197,743,1400,770"/>
+<area shape="rect" id="node22" title=" " alt="" coords="1093,833,1291,859"/>
+<area shape="rect" id="node24" title=" " alt="" coords="1366,833,1437,859"/>
+<area shape="rect" id="node29" href="$_elasticity_utils_8hpp.html" title=" " alt="" coords="2022,393,2194,435"/>
+<area shape="rect" id="node30" href="$_autodiff_types_8hpp.html" title=" " alt="" coords="2953,490,3181,517"/>
+<area shape="rect" id="node31" title=" " alt="" coords="2387,490,2443,517"/>
+<area shape="rect" id="node39" title=" " alt="" coords="4056,401,4197,427"/>
+<area shape="rect" id="node40" title=" " alt="" coords="4221,401,4341,427"/>
+<area shape="rect" id="node41" title=" " alt="" coords="4366,401,4533,427"/>
+<area shape="rect" id="node42" title=" " alt="" coords="4557,401,4662,427"/>
+<area shape="rect" id="node43" title=" " alt="" coords="4686,401,4837,427"/>
+<area shape="rect" id="node44" title=" " alt="" coords="4861,393,5051,435"/>
+<area shape="rect" id="node50" title=" " alt="" coords="245,490,315,517"/>
+</map>

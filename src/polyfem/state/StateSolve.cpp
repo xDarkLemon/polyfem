@@ -641,7 +641,7 @@ namespace polyfem
 		std::shared_ptr<cppoptlib::NonlinearSolver<NLProblem>> nlsolver = make_nl_solver<NLProblem>();
 		nlsolver->setLineSearch(args["solver"]["nonlinear"]["line_search"]["method"]);
 		nl_problem.init(sol);
-		nlsolver->minimize(nl_problem, tmp_sol);
+		nlsolver->minimize_gpu(nl_problem, tmp_sol);
 		json nl_solver_info;
 		nlsolver->getInfo(nl_solver_info);
 		solver_info.push_back({{"type", "rc"},
@@ -657,7 +657,7 @@ namespace polyfem
 		{
 			logger().debug("Lagging iteration {:d}", lag_i + 1);
 			nl_problem.init(sol);
-			nlsolver->minimize(nl_problem, tmp_sol);
+			nlsolver->minimize_gpu(nl_problem, tmp_sol);
 
 			nlsolver->getInfo(nl_solver_info);
 			solver_info.push_back({{"type", "rc"},
@@ -941,7 +941,7 @@ namespace polyfem
 		std::shared_ptr<cppoptlib::NonlinearSolver<NLProblem>> nlsolver = make_nl_solver<NLProblem>();
 		nlsolver->setLineSearch(args["solver"]["nonlinear"]["line_search"]["method"]);
 		nl_problem.init(sol);
-		nlsolver->minimize(nl_problem, tmp_sol);
+		nlsolver->minimize_gpu(nl_problem, tmp_sol);
 		json nl_solver_info;
 		nlsolver->getInfo(nl_solver_info);
 		solver_info.push_back({{"type", "rc"},
@@ -969,7 +969,7 @@ namespace polyfem
 			// Disable damping for the final lagged iteration
 			if (lag_i == friction_iterations - 1)
 				nl_problem.lagged_damping_weight() = 0;
-			nlsolver->minimize(nl_problem, tmp_sol);
+			nlsolver->minimize_gpu(nl_problem, tmp_sol);
 
 			nlsolver->getInfo(nl_solver_info);
 			solver_info.push_back({{"type", "rc"},

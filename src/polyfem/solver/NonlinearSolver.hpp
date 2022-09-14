@@ -12,6 +12,8 @@
 
 namespace cppoptlib
 {
+	using json = polyfem::json;
+	
 	template <typename ProblemType /*, int Ord*/>
 	class NonlinearSolver : public ISolver<ProblemType, /*Ord=*/-1>
 	{
@@ -50,6 +52,8 @@ namespace cppoptlib
 			m_line_search = polyfem::solver::line_search::LineSearch<ProblemType>::construct_line_search(line_search_name);
 			solver_info["line_search"] = line_search_name;
 		}
+		
+		void minimize_gpu(ProblemType &objFunc,  Eigen::Matrix<double, -1, 1> &x);
 
 		void minimize(ProblemType &objFunc, TVector &x)
 		{
@@ -60,6 +64,8 @@ namespace cppoptlib
 			// ---------------------------
 
 			reset(objFunc, x); // place for children to initialize their fields
+
+			typedef Eigen::Matrix<double, -1, 1> TVector;
 
 			TVector grad = TVector::Zero(x.rows());
 			TVector delta_x = TVector::Zero(x.rows());
@@ -322,6 +328,7 @@ namespace cppoptlib
 		}
 
 		// Compute the search/update direction
+		virtual bool compute_update_direction_gpu(ProblemType &objFunc, const Eigen::Matrix<double, -1, 1> &x_vec, const Eigen::Matrix<double, -1, 1> &grad, Eigen::Matrix<double, -1, 1> &direction) = 0;
 		virtual bool compute_update_direction(ProblemType &objFunc, const TVector &x_vec, const TVector &grad, TVector &direction) = 0;
 
 	protected:

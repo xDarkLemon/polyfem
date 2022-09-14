@@ -3,6 +3,7 @@ set(SOURCES
 	LineSearch.tpp
 	ArmijoLineSearch.hpp
 	BacktrackingLineSearch.hpp
+	BacktrackingLineSearch.cu
 	CppOptArmijoLineSearch.hpp
 	MoreThuenteLineSearch.hpp
 )

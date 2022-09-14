@@ -1,6 +1,8 @@
 set(SOURCES
 	NonlinearSolver.hpp
+	NonlinearSolver.cu
 	SparseNewtonDescentSolver.hpp
+	SparseNewtonDescentSolver.cu
 	LBFGSSolver.hpp
 	NLProblem.cpp
 	NLProblem.hpp

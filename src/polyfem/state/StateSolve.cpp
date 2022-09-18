@@ -641,6 +641,7 @@ namespace polyfem
 		std::shared_ptr<cppoptlib::NonlinearSolver<NLProblem>> nlsolver = make_nl_solver<NLProblem>();
 		nlsolver->setLineSearch(args["solver"]["nonlinear"]["line_search"]["method"]);
 		nl_problem.init(sol);
+<<<<<<< HEAD
 #ifdef USE_GPU
 		nlsolver->minimize(nl_problem, tmp_sol);
 		//nlsolver->minimize_gpu(nl_problem, tmp_sol);
@@ -650,6 +651,14 @@ namespace polyfem
 #endif
 
 
+=======
+#ifdef USE_NONLINEAR_GPU
+		nlsolver->minimize_gpu(nl_problem, tmp_sol);
+#endif
+#ifndef USE_NONLINEAR_GPU
+		nlsolver->minimize(nl_problem, tmp_sol);
+#endif
+>>>>>>> 5a7194d3... Add USE_NONLINEAR_GPU option for precompiling
 		json nl_solver_info;
 		nlsolver->getInfo(nl_solver_info);
 		solver_info.push_back({{"type", "rc"},
@@ -665,6 +674,7 @@ namespace polyfem
 		{
 			logger().debug("Lagging iteration {:d}", lag_i + 1);
 			nl_problem.init(sol);
+<<<<<<< HEAD
 #ifdef USE_GPU
 			nlsolver->minimize(nl_problem, tmp_sol);
 			//nlsolver->minimize_gpu(nl_problem, tmp_sol);
@@ -673,6 +683,14 @@ namespace polyfem
 			nlsolver->minimize(nl_problem, tmp_sol);
 #endif
 
+=======
+#ifdef USE_NONLINEAR_GPU
+			nlsolver->minimize_gpu(nl_problem, tmp_sol);
+#endif
+#ifndef USE_NONLINEAR_GPU
+			nlsolver->minimize(nl_problem, tmp_sol);
+#endif
+>>>>>>> 5a7194d3... Add USE_NONLINEAR_GPU option for precompiling
 			nlsolver->getInfo(nl_solver_info);
 			solver_info.push_back({{"type", "rc"},
 								   {"t", t},
@@ -955,11 +973,18 @@ namespace polyfem
 		std::shared_ptr<cppoptlib::NonlinearSolver<NLProblem>> nlsolver = make_nl_solver<NLProblem>();
 		nlsolver->setLineSearch(args["solver"]["nonlinear"]["line_search"]["method"]);
 		nl_problem.init(sol);
+<<<<<<< HEAD
 #ifdef USE_GPU
 		nlsolver->minimize(nl_problem, tmp_sol);
 		//nlsolver->minimize_gpu(nl_problem, tmp_sol);
 #endif
 #ifndef USE_GPU
+=======
+#ifdef USE_NONLINEAR_GPU
+		nlsolver->minimize_gpu(nl_problem, tmp_sol);
+#endif
+#ifndef USE_NONLINEAR_GPU
+>>>>>>> 5a7194d3... Add USE_NONLINEAR_GPU option for precompiling
 		nlsolver->minimize(nl_problem, tmp_sol);
 #endif
 		json nl_solver_info;
@@ -989,6 +1014,7 @@ namespace polyfem
 			// Disable damping for the final lagged iteration
 			if (lag_i == friction_iterations - 1)
 				nl_problem.lagged_damping_weight() = 0;
+<<<<<<< HEAD
 #ifdef USE_GPU
 			nlsolver->minimize(nl_problem, tmp_sol);
 			//nlsolver->minimize_gpu(nl_problem, tmp_sol);
@@ -997,6 +1023,14 @@ namespace polyfem
 			nlsolver->minimize(nl_problem, tmp_sol);
 #endif
 
+=======
+#ifdef USE_NONLINEAR_GPU
+			nlsolver->minimize_gpu(nl_problem, tmp_sol);
+#endif
+#ifndef USE_NONLINEAR_GPU
+			nlsolver->minimize(nl_problem, tmp_sol);
+#endif
+>>>>>>> 5a7194d3... Add USE_NONLINEAR_GPU option for precompiling
 			nlsolver->getInfo(nl_solver_info);
 			solver_info.push_back({{"type", "rc"},
 								   {"lag_i", lag_i},

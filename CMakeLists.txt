@@ -133,6 +133,12 @@ else()
     message(STATUS "NOT USING GPU")
 endif()
 
+set(USE_NONLINEAR_GPU ON)
+
+if(USE_NONLINEAR_GPU)
+    add_definitions(-DUSE_NONLINEAR_GPU)
+endif()
+
 # ###############################################################################
 
 # set(POLYFEM_SMALL_N 105 CACHE STRING "" FORCE)

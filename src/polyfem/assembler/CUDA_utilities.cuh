@@ -4,11 +4,38 @@
 #include <stdio.h>
 
 #define NUMBER_THREADS 32
+#define gpuErrchk(ans)                        \
+	{                                         \
+		gpuAssert((ans), __FILE__, __LINE__); \
+	}
+inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort = true)
+{
+	if (code != cudaSuccess)
+	{
+		fprintf(stderr, "GPUassert: %s %s %d\n", cudaGetErrorString(code), file, line);
+		if (abort)
+			exit(code);
+	}
+}
+
+#define CHECK_CUDA_ERROR(val) check((val), #val, __FILE__, __LINE__)
+template <typename T>
+void check(T err, char const *const func, char const *const file,
+		   int const line)
+{
+	if (err != cudaSuccess)
+	{
+		std::cerr << "CUDA Runtime Error at: " << file << ":" << line
+				  << std::endl;
+		std::cerr << cudaGetErrorString(err) << " " << func << std::endl;
+		std::exit(EXIT_FAILURE);
+	}
+}
 
 template <typename T>
 T *ALLOCATE_GPU(T *d_A, int _size)
 {
-	if (cudaMalloc((void **)&d_A, _size) != cudaSuccess)
+	if (cudaMalloc(reinterpret_cast<void **>(&d_A), _size) != cudaSuccess)
 	{
 		cudaError_t err = cudaGetLastError(); // Get error code
 		printf("CUDA Error: %s\n", cudaGetErrorString(err));

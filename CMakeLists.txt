@@ -44,8 +44,8 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/recipes/")
 
 #SETTING OPT 0 compiler flag for DEBUG mode
-string(REGEX REPLACE "(\-O[011123456789])" "" CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG}")
-set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -O0")
+#string(REGEX REPLACE "(\-O[011123456789])" "" CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG}")
+#set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -O0")
 
 # Color output
 include(UseColors)
@@ -356,6 +356,10 @@ endif()
 
 # target_include_directories(polyfem PUBLIC ${Thrust_INCLUDE_DIRS})
 # target_link_libraries(polyfem PUBLIC Thrust)
+
+#USING AS SHARED LIBRARY
+
+#set(CUDA_USE_STATIC_CUDA_RUNTIME OFF CACHE INTERNAL "") 
 include(CheckLanguage)
 check_language(CUDA)
 
@@ -367,8 +371,8 @@ endif()
 
 set_target_properties(polyfem PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
 #SETTING OPT 0 compiler flag for DEBUG mode
-string(REGEX REPLACE "(\-O[011123456789])" "" CMAKE_CUDA_FLAGS_DEBUG "${CMAKE_CUDA_FLAGS_DEBUG}")
-set(CMAKE_CUDA_FLAGS_DEBUG "${CMAKE_CUDA_FLAGS_DEBUG} -O0 -G")
+#string(REGEX REPLACE "(\-O[011123456789])" "" CMAKE_CUDA_FLAGS_DEBUG "${CMAKE_CUDA_FLAGS_DEBUG}")
+#set(CMAKE_CUDA_FLAGS_DEBUG "${CMAKE_CUDA_FLAGS_DEBUG} -O0 -G")
 
 # foreach(flag IN LISTS ${CXX17_FEATURES})
 # add_compile_options("$<$<COMPILE_LANGUAGE:CUDA>:--compiler-options=${flag}>")
@@ -380,6 +384,12 @@ set(CMAKE_CUDA_FLAGS_DEBUG "${CMAKE_CUDA_FLAGS_DEBUG} -O0 -G")
 if(NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
     set(CMAKE_CUDA_ARCHITECTURES 60 70 75 86)
 endif()
+
+#set(CMAKE_CUDA_FLAGS "-shared -cudart shared -Xcompiler -fPIC"
+#CACHE STRING "Use libcudart.dylib" FORCE)
+
+#target_link_libraries(polyfem PRIVATE cudart) #MUST!!
+
 
 set_target_properties(polyfem PROPERTIES CUDA_ARCHITECTURES "60;70;75;86")
 set_target_properties(PolyFEM_bin PROPERTIES CUDA_ARCHITECTURES "60;70;75;86")

@@ -41,12 +41,12 @@ namespace polyfem
 			}
 			thrust::device_vector<double> displacement_dev(displacement.col(0).begin(), displacement.col(0).end());
 
-			int jac_it_N = vals_array[0].jac_it.size();
-			thrust::device_vector<Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, 0, 3, 3>> jac_it_dev(n_bases * jac_it_N);
+			int jac_it_size = vals_array[0].jac_it.size();
+			thrust::device_vector<Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, 0, 3, 3>> jac_it_dev(n_bases * jac_it_size);
 
-			int basis_values_N = vals_array[0].basis_values.size();
-			int global_columns_N = vals_array[0].basis_values[0].global.size();
-			thrust::device_vector<basis::Local2Global> global_data_dev(n_bases * basis_values_N * global_columns_N);
+			int n_loc_bases = vals_array[0].basis_values.size();
+			int global_vector_size = vals_array[0].basis_values[0].global.size();
+			thrust::device_vector<basis::Local2Global> global_data_dev(n_bases * n_loc_bases * global_vector_size);
 
 			thrust::host_vector<Eigen::Matrix<double, -1, 1, 0, 3, 1>> da_host(n_bases);
 
@@ -57,10 +57,9 @@ namespace polyfem
 				da_host[e].resize(N, 1);
 				da_host[e] = vals_array[e].det.array() * vals_array[e].quadrature.weights.array();
 
-				thrust::copy(vals_array[e].jac_it.begin(), vals_array[e].jac_it.end(), jac_it_dev.begin() + e * jac_it_N);
-				for (int f = 0; f < basis_values_N; f++)
-					//needs to be checked
-					thrust::copy(vals_array[e].basis_values[f].global.begin(), vals_array[e].basis_values[f].global.end(), global_data_dev.begin() + e * (basis_values_N * global_columns_N) + f * global_columns_N);
+				thrust::copy(vals_array[e].jac_it.begin(), vals_array[e].jac_it.end(), jac_it_dev.begin() + e * jac_it_size);
+				for (int f = 0; f < n_loc_bases; f++)
+					thrust::copy(vals_array[e].basis_values[f].global.begin(), vals_array[e].basis_values[f].global.end(), global_data_dev.begin() + e * (n_loc_bases * global_vector_size) + f * global_vector_size);
 			}
 
 			thrust::device_vector<Eigen::Matrix<double, -1, 1, 0, 3, 1>> da_dev(n_bases);
@@ -69,14 +68,14 @@ namespace polyfem
 			double lambda, mu;
 			const int n_pts = da_host[0].size();
 
-			thrust::device_vector<Eigen::Matrix<double, -1, 1, 0, 3, 1>> grad_dev(n_bases * basis_values_N * n_pts);
+			thrust::device_vector<Eigen::Matrix<double, -1, 1, 0, 3, 1>> grad_dev(n_bases * n_loc_bases * n_pts);
 			for (int e = 0; e < n_bases; ++e)
 			{
-				for (int f = 0; f < basis_values_N; f++)
+				for (int f = 0; f < n_loc_bases; f++)
 				{
 					for (int p = 0; p < n_pts; p++)
-						grad_dev[e * basis_values_N * n_pts + f * n_pts + p] = vals_array[e].basis_values[f].grad.row(p);
-					//					thrust::copy(vals_array[e].basis_values[f].grad.row(p).begin(),vals_array[e].basis_values[f].grad.row(p).end(), grad_dev.begin()+e*(basis_values_N*global_columns_N)+f*global_columns_N+p);
+						grad_dev[e * n_loc_bases * n_pts + f * n_pts + p] = vals_array[e].basis_values[f].grad.row(p);
+					//					thrust::copy(vals_array[e].basis_values[f].grad.row(p).begin(),vals_array[e].basis_values[f].grad.row(p).end(), grad_dev.begin()+e*(n_loc_bases*global_vector_size)+f*global_vector_size+p);
 				}
 			}
 
@@ -110,8 +109,8 @@ namespace polyfem
 															da_dev_ptr,
 															grad_dev_ptr,
 															n_bases,
-															basis_values_N,
-															global_columns_N,
+															n_loc_bases,
+															global_vector_size,
 															n_pts,
 															lambda_ptr,
 															mu_ptr);
@@ -145,13 +144,13 @@ namespace polyfem
 				cache.compute(e, is_volume, bases[e], gbases[e], vals_array[e]);
 			}
 			thrust::device_vector<double> displacement_dev(displacement.col(0).begin(), displacement.col(0).end());
-			int jac_it_N = vals_array[0].jac_it.size();
+			int jac_it_size = vals_array[0].jac_it.size();
 
-			thrust::device_vector<Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, 0, 3, 3>> jac_it_dev(n_bases * jac_it_N);
+			thrust::device_vector<Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, 0, 3, 3>> jac_it_dev(n_bases * jac_it_size);
 
-			int basis_values_N = vals_array[0].basis_values.size();
-			int global_columns_N = vals_array[0].basis_values[0].global.size();
-			thrust::device_vector<basis::Local2Global> global_data_dev(n_bases * basis_values_N * global_columns_N);
+			int n_loc_bases = vals_array[0].basis_values.size();
+			int global_vector_size = vals_array[0].basis_values[0].global.size();
+			thrust::device_vector<basis::Local2Global> global_data_dev(n_bases * n_loc_bases * global_vector_size);
 
 			thrust::host_vector<Eigen::Matrix<double, -1, 1, 0, 3, 1>> da_host(n_bases);
 
@@ -162,11 +161,11 @@ namespace polyfem
 				da_host[e].resize(N, 1);
 				da_host[e] = vals_array[e].det.array() * vals_array[e].quadrature.weights.array();
 
-				thrust::copy(vals_array[e].jac_it.begin(), vals_array[e].jac_it.end(), jac_it_dev.begin() + e * jac_it_N);
-				for (int f = 0; f < basis_values_N; f++)
+				thrust::copy(vals_array[e].jac_it.begin(), vals_array[e].jac_it.end(), jac_it_dev.begin() + e * jac_it_size);
+				for (int f = 0; f < n_loc_bases; f++)
 				{
 					//needs a paranoic check
-					thrust::copy(vals_array[e].basis_values[f].global.begin(), vals_array[e].basis_values[f].global.end(), global_data_dev.begin() + e * (basis_values_N * global_columns_N) + f * global_columns_N);
+					thrust::copy(vals_array[e].basis_values[f].global.begin(), vals_array[e].basis_values[f].global.end(), global_data_dev.begin() + e * (n_loc_bases * global_vector_size) + f * global_vector_size);
 				}
 			}
 
@@ -175,13 +174,13 @@ namespace polyfem
 
 			const int n_pts = da_host[0].size();
 
-			thrust::device_vector<Eigen::Matrix<double, -1, -1, 0, 3, 3>> grad_dev(n_bases * basis_values_N * n_pts);
+			thrust::device_vector<Eigen::Matrix<double, -1, -1, 0, 3, 3>> grad_dev(n_bases * n_loc_bases * n_pts);
 			for (int e = 0; e < n_bases; ++e)
 			{
-				for (int f = 0; f < basis_values_N; f++)
+				for (int f = 0; f < n_loc_bases; f++)
 				{
 					for (int p = 0; p < n_pts; p++)
-						grad_dev[e * basis_values_N * n_pts + f * n_pts + p] = vals_array[e].basis_values[f].grad.row(p);
+						grad_dev[e * n_loc_bases * n_pts + f * n_pts + p] = vals_array[e].basis_values[f].grad.row(p);
 				}
 			}
 
@@ -214,8 +213,8 @@ namespace polyfem
 													 da_dev_ptr,
 													 grad_dev_ptr,
 													 n_bases,
-													 basis_values_N,
-													 global_columns_N,
+													 n_loc_bases,
+													 global_vector_size,
 													 n_pts,
 													 lambda_ptr,
 													 mu_ptr,
@@ -240,8 +239,8 @@ namespace polyfem
 			int *inner_index_ptr,
 			int size_innerindex) const
 		{
-
 			// AFTER CALLED assemble_hessian ONE TIME
+
 			mat_cache.init(n_basis * local_assembler_.size());
 			mat_cache.set_zero();
 
@@ -253,17 +252,30 @@ namespace polyfem
 			{
 				cache.compute(e, is_volume, bases[e], gbases[e], vals_array[e]);
 			}
+
+			//	try
+			//	{
 			thrust::device_vector<double> displacement_dev(displacement.col(0).begin(), displacement.col(0).end());
-			int jac_it_N = vals_array[0].jac_it.size();
+			//	}
+			//	catch (thrust::system_error &e)
+			//	{
+			//		std::cerr << "Some other error happened during device vector double: " << e.what() << std::endl;
+			//		exit(-1);
+			//	}
 
-			thrust::device_vector<Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, 0, 3, 3>> jac_it_dev(n_bases * jac_it_N);
+			int jac_it_size = vals_array[0].jac_it.size();
+			//
+			thrust::device_vector<Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, 0, 3, 3>> jac_it_dev(n_bases * jac_it_size);
+			//
+			int n_loc_bases = vals_array[0].basis_values.size();
+			int global_vector_size = vals_array[0].basis_values[0].global.size();
+			//
 
-			int basis_values_N = vals_array[0].basis_values.size();
-			int global_columns_N = vals_array[0].basis_values[0].global.size();
-			thrust::device_vector<basis::Local2Global> global_data_dev(n_bases * basis_values_N * global_columns_N);
-
+			thrust::host_vector<basis::Local2Global_GPU> global_data_host(n_bases * n_loc_bases * global_vector_size);
+			thrust::device_vector<basis::Local2Global_GPU> global_data_dev(n_bases * n_loc_bases * global_vector_size);
+			//CHANGE THIS TO WHATEVER
 			thrust::host_vector<Eigen::Matrix<double, -1, 1, 0, 3, 1>> da_host(n_bases);
-
+			//
 			for (int e = 0; e < n_bases; ++e)
 			{
 				//assert(MAX_QUAD_POINTS == -1 || quadrature.weights.size() < MAX_QUAD_POINTS);
@@ -271,30 +283,34 @@ namespace polyfem
 				da_host[e].resize(N, 1);
 				da_host[e] = vals_array[e].det.array() * vals_array[e].quadrature.weights.array();
 
-				thrust::copy(vals_array[e].jac_it.begin(), vals_array[e].jac_it.end(), jac_it_dev.begin() + e * jac_it_N);
-				for (int f = 0; f < basis_values_N; f++)
+				thrust::copy(vals_array[e].jac_it.begin(), vals_array[e].jac_it.end(), jac_it_dev.begin() + e * jac_it_size);
+				for (int f = 0; f < n_loc_bases; f++)
 				{
 					//needs a paranoic check
-					thrust::copy(vals_array[e].basis_values[f].global.begin(), vals_array[e].basis_values[f].global.end(), global_data_dev.begin() + e * (basis_values_N * global_columns_N) + f * global_columns_N);
+					for (int g = 0; g < global_vector_size; g++)
+					{
+						global_data_host[e * (n_loc_bases * global_vector_size) + f * global_vector_size + g].index = vals_array[e].basis_values[f].global[g].index;
+						global_data_host[e * (n_loc_bases * global_vector_size) + f * global_vector_size + g].val = vals_array[e].basis_values[f].global[g].val;
+						//thrust::copy(vals_array[e].basis_values[f].global.begin(), vals_array[e].basis_values[f].global.end(), global_data_dev.begin() + e * (n_loc_bases * global_vector_size) + f * );
+					}
 				}
 			}
-
+			thrust::copy(global_data_host.begin(), global_data_host.end(), global_data_dev.begin());
+			//
 			thrust::device_vector<Eigen::Matrix<double, -1, 1, 0, 3, 1>> da_dev(n_bases);
 			thrust::copy(da_host.begin(), da_host.end(), da_dev.begin());
-
+			//
 			const int n_pts = da_host[0].size();
-
-			thrust::device_vector<Eigen::Matrix<double, -1, -1, 0, 3, 3>> grad_dev(n_bases * basis_values_N * n_pts);
+			//
+			thrust::device_vector<Eigen::Matrix<double, -1, -1, 0, 3, 3>> grad_dev(n_bases * n_loc_bases * n_pts);
 			for (int e = 0; e < n_bases; ++e)
 			{
-				for (int f = 0; f < basis_values_N; f++)
+				for (int f = 0; f < n_loc_bases; f++)
 				{
 					for (int p = 0; p < n_pts; p++)
-						grad_dev[e * basis_values_N * n_pts + f * n_pts + p] = vals_array[e].basis_values[f].grad.row(p);
+						grad_dev[e * n_loc_bases * n_pts + f * n_pts + p] = vals_array[e].basis_values[f].grad.row(p);
 				}
 			}
-
-			//basis_values_N <--> n_loc_bases
 
 			// extract all lambdas and mus and set to device vector
 			double lambda, mu;
@@ -306,13 +322,14 @@ namespace polyfem
 				lambda_array[p] = lambda;
 				mu_array[p] = mu;
 			}
-
-			// READY TO SEND ALL TO GPU
-
+			//
+			//			// READY TO SEND ALL TO GPU
+			//
 			double *displacement_dev_ptr = thrust::raw_pointer_cast(displacement_dev.data());
 
 			Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, 0, 3, 3> *jac_it_dev_ptr = thrust::raw_pointer_cast(jac_it_dev.data());
-			basis::Local2Global *global_data_dev_ptr = thrust::raw_pointer_cast(global_data_dev.data());
+			basis::Local2Global_GPU *global_data_dev_ptr = thrust::raw_pointer_cast(global_data_dev.data());
+			//basis::Local2Global *global_data_dev_ptr = nullptr;
 			Eigen::Matrix<double, -1, 1, 0, 3, 1> *da_dev_ptr = thrust::raw_pointer_cast(da_dev.data());
 			Eigen::Matrix<double, -1, -1, 0, 3, 3> *grad_dev_ptr = thrust::raw_pointer_cast(grad_dev.data());
 
@@ -322,32 +339,31 @@ namespace polyfem
 			//SET UP MOVING VALUES FUNC (INNER AND OUTER INDEX ALREADY SENT TO GPU)
 
 			std::vector<double> computed_values(mat_cache.non_zeros(), 0);
-
+			//
 			computed_values = local_assembler_.assemble_hessian_GPU(displacement_dev_ptr,
 																	jac_it_dev_ptr,
 																	global_data_dev_ptr,
 																	da_dev_ptr,
 																	grad_dev_ptr,
 																	n_bases,
-																	basis_values_N,
-																	global_columns_N,
+																	n_loc_bases,
+																	global_vector_size,
 																	n_pts,
 																	lambda_ptr,
 																	mu_ptr,
-																	n_basis,
 																	outer_index_ptr,
 																	size_outerindex,
 																	inner_index_ptr,
 																	size_innerindex);
 			//computed_values);
-
-			// WE NEED TO GO BACK HERE
-			//if (project_to_psd)
-			//	stiffness_val = ipc::project_to_psd(stiffness_val);
-
+			//
+			//			// WE NEED TO GO BACK HERE
+			//			//if (project_to_psd)
+			//			//	stiffness_val = ipc::project_to_psd(stiffness_val);
+			//
 			mat_cache.moving_values(computed_values);
 			//mat_cache.print_values();
-
+			//
 			grad = mat_cache.get_matrix();
 			return;
 		}

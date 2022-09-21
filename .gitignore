@@ -53,6 +53,7 @@ __pycache__
 .vscode/
 .idea/
 *build/
+build*
 cmake-build-*/
 bin*
 bin_rel*
@@ -61,7 +62,6 @@ build*
 xcode*
 3rdparty*
 /data
-/test_build
 
 .DS_STORE
 

@@ -8,7 +8,7 @@ endif()
     FetchContent_Declare(
         Thrust
         GIT_REPOSITORY https://github.com/NVIDIA/thrust
-        GIT_TAG tags/1.17.0
+        GIT_TAG tags/1.17.2
         GIT_SHALLOW TRUE
     )
     FetchContent_GetProperties(Thrust)

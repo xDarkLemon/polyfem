@@ -54,6 +54,7 @@ __pycache__
 .idea/
 build/
 test_build/
+debug_build/
 cmake-build-*/
 bin*
 bin_rel*

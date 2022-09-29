@@ -80,14 +80,6 @@ namespace polyfem
 
 			void add_value(const int e, const int i, const int j, const double value);
 
-			void print_entries();
-			void print_oindex();
-			void print_iindex();
-			void print_matrix();
-			void print_values();
-			void print_mapping();
-			void print_second_cache();
-
 			StiffnessMatrix get_matrix(const bool compute_mapping = true);
 			void prune();
 

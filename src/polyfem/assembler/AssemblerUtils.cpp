@@ -249,29 +249,43 @@ namespace polyfem
 				saint_venant_elasticity_.assemble_hessian(is_volume, n_basis, project_to_psd, bases, gbases, cache, displacement, mat_cache, hessian);
 #ifdef USE_GPU
 			else if (assembler == "NeoHookean"){
-				static int* outer_index_ptr = nullptr;
-				static int* inner_index_ptr = nullptr;
+				static int* outer_index_ptr = nullptr ;
+				static int* inner_index_ptr = nullptr ;
 				static int flag_cache_compute = 0;
-				static int size_outerindex = 0;
-				static int size_innerindex = 0;
+				static int size_outer_index = 0;
+				static int size_inner_index = 0;
 				if(!flag_cache_compute){
 					neo_hookean_elasticity_.assemble_hessian(is_volume, n_basis, project_to_psd, bases, gbases, cache, displacement, mat_cache, hessian);
 					auto outer_ = mat_cache.outer_index_to_gpu();
 					auto inner_ = mat_cache.inner_index_to_gpu();
-					size_outerindex = outer_.size();
-					size_innerindex = inner_.size();
+					size_outer_index = outer_.size();
+					size_inner_index = inner_.size();
 
 					// NEEDS TO BE FREED
-					outer_index_ptr = ALLOCATE_GPU(outer_index_ptr, sizeof(int)*size_outerindex);
-					inner_index_ptr = ALLOCATE_GPU(inner_index_ptr, sizeof(int)*size_innerindex);
+					outer_index_ptr = ALLOCATE_GPU(outer_index_ptr, sizeof(int)*size_outer_index);
+				//	cudaDeviceSynchronize();
+					inner_index_ptr = ALLOCATE_GPU(inner_index_ptr, sizeof(int)*size_inner_index);
 
-					COPYDATATOGPU(outer_index_ptr, outer_.data(), sizeof(int)*size_outerindex);
-					COPYDATATOGPU(inner_index_ptr, inner_.data(), sizeof(int)*size_innerindex);
+					COPYDATATOGPU(outer_index_ptr, outer_.data(), sizeof(int)*size_outer_index);
+					COPYDATATOGPU(inner_index_ptr, inner_.data(), sizeof(int)*size_inner_index);
 
+
+					size_t free_bytes=0, total_bytes=0;
+  					cudaMemGetInfo( &free_bytes, &total_bytes );
+  					std::cout << "Mem GPU Free : " << free_bytes << " bytes" << std::endl;
+    				std::cout << "Mem GPU Total: " << total_bytes << " bytes" << std::endl;
+        			size_t sizeLimit = 0;
+        			cudaDeviceGetLimit( &sizeLimit, cudaLimitMallocHeapSize );
+       				std::cout << "Original device heap sizeLimit: " << sizeLimit << std::endl;
+ 
+			        cudaDeviceSetLimit( cudaLimitMallocHeapSize, free_bytes );
+ 
+			        cudaDeviceGetLimit( &sizeLimit, cudaLimitMallocHeapSize );
+			        std::cout << "Current device heap sizeLimit: " << sizeLimit << std::endl;
 					flag_cache_compute++;
 				}
 
-				neo_hookean_elasticity_.assemble_hessian_GPU(is_volume, n_basis, project_to_psd, bases, gbases, cache, displacement, mat_cache, hessian, outer_index_ptr, size_outerindex, inner_index_ptr, size_innerindex);
+				neo_hookean_elasticity_.assemble_hessian_GPU(is_volume, n_basis, project_to_psd, bases, gbases, cache, displacement, mat_cache, hessian, outer_index_ptr, size_outer_index, inner_index_ptr, size_inner_index);
 			}
 #endif
 #ifndef USE_GPU

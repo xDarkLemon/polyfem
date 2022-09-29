@@ -37,6 +37,12 @@ namespace polyfem
 			}
 		};
 
+		class Local2Global_GPU
+		{
+		public:
+			int index;  ///< global index of the actual node
+			double val; ///< weight
+		};	
 		///
 		/// @brief      Represents one basis function and its gradient.
 		///

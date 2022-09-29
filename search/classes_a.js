@@ -12,6 +12,7 @@ var searchData=
   ['linequadrature_9',['LineQuadrature',['../classpolyfem_1_1quadrature_1_1_line_quadrature.html',1,'polyfem::quadrature']]],
   ['linesearch_10',['LineSearch',['../classpolyfem_1_1solver_1_1line__search_1_1_line_search.html',1,'polyfem::solver::line_search']]],
   ['local2global_11',['Local2Global',['../classpolyfem_1_1basis_1_1_local2_global.html',1,'polyfem::basis']]],
-  ['localboundary_12',['LocalBoundary',['../classpolyfem_1_1mesh_1_1_local_boundary.html',1,'polyfem::mesh']]],
-  ['lshape_13',['Lshape',['../classpolyfem_1_1problem_1_1_lshape.html',1,'polyfem::problem']]]
+  ['local2global_5fgpu_12',['Local2Global_GPU',['../classpolyfem_1_1basis_1_1_local2_global___g_p_u.html',1,'polyfem::basis']]],
+  ['localboundary_13',['LocalBoundary',['../classpolyfem_1_1mesh_1_1_local_boundary.html',1,'polyfem::mesh']]],
+  ['lshape_14',['Lshape',['../classpolyfem_1_1problem_1_1_lshape.html',1,'polyfem::problem']]]
 ];

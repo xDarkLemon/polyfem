@@ -95,6 +95,7 @@ var hierarchy =
       [ "polyfem::solver::line_search::MoreThuenteLineSearch< ProblemType >", "classpolyfem_1_1solver_1_1line__search_1_1_more_thuente_line_search.html", null ]
     ] ],
     [ "polyfem::basis::Local2Global", "classpolyfem_1_1basis_1_1_local2_global.html", null ],
+    [ "polyfem::basis::Local2Global_GPU", "classpolyfem_1_1basis_1_1_local2_global___g_p_u.html", null ],
     [ "polyfem::mesh::LocalBoundary", "classpolyfem_1_1mesh_1_1_local_boundary.html", null ],
     [ "polyfem::assembler::MassMatrixAssembler", "classpolyfem_1_1assembler_1_1_mass_matrix_assembler.html", null ],
     [ "polyfem::renderer::Material", "structpolyfem_1_1renderer_1_1_material.html", null ],

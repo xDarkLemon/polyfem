@@ -1,13 +1,5 @@
 var NAVTREEINDEX27 =
 {
-"struct_d_scalar2.html#ae9fe9454ceb6b0261a41c9c538c03d2e":[4,0,8,46],
-"struct_d_scalar2.html#aec857038963a0b4028b4e4306048c24c":[4,0,8,12],
-"struct_d_scalar2.html#aec9ac875715861553a48e25edab5892e":[4,0,8,47],
-"struct_d_scalar2.html#af7af35c5422abf47074e17cfc977d1df":[4,0,8,4],
-"struct_d_scalar2.html#afa50b6af8bab0bc51d633e09abdff0d7":[4,0,8,44],
-"struct_diff_scalar_base.html":[4,0,6],
-"structnlohmann_1_1adl__serializer_3_01_row_vector_3_01_t_00_01dim_00_01max__dim_01_4_01_4.html":[4,0,1,0],
-"structnlohmann_1_1adl__serializer_3_01_row_vector_3_01_t_00_01dim_00_01max__dim_01_4_01_4.html":[3,0,4,0],
 "structnlohmann_1_1adl__serializer_3_01_vector_3_01_t_00_01dim_00_01max__dim_01_4_01_4.html":[4,0,1,1],
 "structnlohmann_1_1adl__serializer_3_01_vector_3_01_t_00_01dim_00_01max__dim_01_4_01_4.html":[3,0,4,1],
 "structpolyfem_1_1basis_1_1_interface_data.html":[4,0,3,1,4],
@@ -249,5 +241,13 @@ var NAVTREEINDEX27 =
 "structpolyfem_1_1mesh_1_1_n_c_mesh3_d_1_1nc_boundary.html":[3,0,6,3,17,4],
 "structpolyfem_1_1mesh_1_1_n_c_mesh3_d_1_1nc_boundary.html":[4,0,3,2,15,4],
 "structpolyfem_1_1mesh_1_1_n_c_mesh3_d_1_1nc_boundary.html#a076dd8387709cbe395f3e8258fa799e1":[4,0,3,2,15,4,3],
-"structpolyfem_1_1mesh_1_1_n_c_mesh3_d_1_1nc_boundary.html#a076dd8387709cbe395f3e8258fa799e1":[3,0,6,3,17,4,3]
+"structpolyfem_1_1mesh_1_1_n_c_mesh3_d_1_1nc_boundary.html#a076dd8387709cbe395f3e8258fa799e1":[3,0,6,3,17,4,3],
+"structpolyfem_1_1mesh_1_1_n_c_mesh3_d_1_1nc_boundary.html#a268b3b5ed3138859cf99f03ef2a994d8":[3,0,6,3,17,4,2],
+"structpolyfem_1_1mesh_1_1_n_c_mesh3_d_1_1nc_boundary.html#a268b3b5ed3138859cf99f03ef2a994d8":[4,0,3,2,15,4,2],
+"structpolyfem_1_1mesh_1_1_n_c_mesh3_d_1_1nc_boundary.html#a2821b9854edcdf0f97f06d503ed1ce93":[3,0,6,3,17,4,13],
+"structpolyfem_1_1mesh_1_1_n_c_mesh3_d_1_1nc_boundary.html#a2821b9854edcdf0f97f06d503ed1ce93":[4,0,3,2,15,4,13],
+"structpolyfem_1_1mesh_1_1_n_c_mesh3_d_1_1nc_boundary.html#a28893b58fb7adebbfaf32f0b07ac859b":[4,0,3,2,15,4,1],
+"structpolyfem_1_1mesh_1_1_n_c_mesh3_d_1_1nc_boundary.html#a28893b58fb7adebbfaf32f0b07ac859b":[3,0,6,3,17,4,1],
+"structpolyfem_1_1mesh_1_1_n_c_mesh3_d_1_1nc_boundary.html#a289fbacb672cca1791aeddcc90fceab0":[3,0,6,3,17,4,6],
+"structpolyfem_1_1mesh_1_1_n_c_mesh3_d_1_1nc_boundary.html#a289fbacb672cca1791aeddcc90fceab0":[4,0,3,2,15,4,6]
 };

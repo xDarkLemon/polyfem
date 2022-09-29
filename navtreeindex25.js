@@ -1,13 +1,5 @@
 var NAVTREEINDEX25 =
 {
-"namespacepolyfem.html#af46f3e481ec6b7fd3f1963d3f570dbe4":[3,0,6,18],
-"namespacepolyfem.html#af952b2322cc7cfb3abcca5212e2f16d4":[3,0,6,26],
-"namespacepolyfem.html#afe7d5ac326e47bbc47caa5539c4f8172":[3,0,6,28],
-"namespacepolyfem_1_1assembler.html":[3,0,6,0],
-"namespacepolyfem_1_1assembler.html#aaff5aece5fe5a409ef40ca97ac093b32":[3,0,6,0,35],
-"namespacepolyfem_1_1assembler.html#acde7fba90d34c1fca18bdfa2b8a84784":[3,0,6,0,34],
-"namespacepolyfem_1_1autogen.html":[3,0,6,1],
-"namespacepolyfem_1_1autogen.html#a048e18759622a9d960c4bb71cee11fd3":[3,0,6,1,2],
 "namespacepolyfem_1_1autogen.html#a12b075f5cf8ff8bc1f8918ca721bb079":[3,0,6,1,31],
 "namespacepolyfem_1_1autogen.html#a18ee2912d770a6bc9cfe2a485a9ecb25":[3,0,6,1,28],
 "namespacepolyfem_1_1autogen.html#a267b3426fd266f23e433bd1b63eff38c":[3,0,6,1,27],
@@ -40,8 +32,8 @@ var NAVTREEINDEX25 =
 "namespacepolyfem_1_1autogen.html#afb2847614459eb7fce5ba97b0bbd8ceb":[3,0,6,1,4],
 "namespacepolyfem_1_1autogen.html#affa69accbfb13eb3669550bb6c4f2d7b":[3,0,6,1,6],
 "namespacepolyfem_1_1basis.html":[3,0,6,2],
-"namespacepolyfem_1_1basis.html#a05c9a37e7bf673cecb9e7961ec47f656":[3,0,6,2,19],
-"namespacepolyfem_1_1basis.html#a499aa1c6971b36fc766d06a74a7e1482":[3,0,6,2,18],
+"namespacepolyfem_1_1basis.html#a05c9a37e7bf673cecb9e7961ec47f656":[3,0,6,2,20],
+"namespacepolyfem_1_1basis.html#a499aa1c6971b36fc766d06a74a7e1482":[3,0,6,2,19],
 "namespacepolyfem_1_1mesh.html":[3,0,6,3],
 "namespacepolyfem_1_1mesh.html#a0d4be3bab49d477dc6c218108b278acc":[3,0,6,3,29],
 "namespacepolyfem_1_1mesh.html#a0eb020dda8244f82ea9450b2d655cadd":[3,0,6,3,43],
@@ -249,5 +241,13 @@ var NAVTREEINDEX25 =
 "namespaceq__bases.html#ab2f254a6c65a88e651f3163c68327535":[3,0,8,23],
 "namespaceq__bases.html#ab38e5b5bdfa1ee3b515fe658f5d86115":[3,0,8,6],
 "namespaceq__bases.html#ab70be99749abd7ca478d05e36c1966c1":[3,0,8,30],
-"namespaceq__bases.html#abaec2637600b32655edb27cb3a3d103d":[3,0,8,32]
+"namespaceq__bases.html#abaec2637600b32655edb27cb3a3d103d":[3,0,8,32],
+"namespaceq__bases.html#abcc1e867d2861c63d25f4fd2997031ed":[3,0,8,18],
+"namespaceq__bases.html#ac53f0a586c7a8865d3e0d5d900e09b4f":[3,0,8,27],
+"namespaceq__bases.html#acba22225580d5c087a82677fd0497d13":[3,0,8,33],
+"namespaceq__bases.html#ae12d70eb9f96c650569661316f3133ca":[3,0,8,3],
+"namespaceq__bases.html#ae5567cc3ff8c51169b59f2d6fdb8b962":[3,0,8,8],
+"namespaceq__bases.html#aef6c93b3e0117ea0d47a0e6a9ba503dc":[3,0,8,17],
+"namespaceq__bases.html#aefd408e88c0ce2b95ed824841f6cb539":[3,0,8,22],
+"namespaceq__bases.html#af0fe99b4361a802ac7ae1d0d9a9daed0":[3,0,8,21]
 };

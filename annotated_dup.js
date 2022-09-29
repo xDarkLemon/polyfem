@@ -57,6 +57,7 @@ var annotated_dup =
         [ "FEBasis3d", "classpolyfem_1_1basis_1_1_f_e_basis3d.html", null ],
         [ "InterfaceData", "structpolyfem_1_1basis_1_1_interface_data.html", "structpolyfem_1_1basis_1_1_interface_data" ],
         [ "Local2Global", "classpolyfem_1_1basis_1_1_local2_global.html", "classpolyfem_1_1basis_1_1_local2_global" ],
+        [ "Local2Global_GPU", "classpolyfem_1_1basis_1_1_local2_global___g_p_u.html", "classpolyfem_1_1basis_1_1_local2_global___g_p_u" ],
         [ "MVPolygonalBasis2d", "classpolyfem_1_1basis_1_1_m_v_polygonal_basis2d.html", null ],
         [ "PolygonalBasis2d", "classpolyfem_1_1basis_1_1_polygonal_basis2d.html", null ],
         [ "PolygonalBasis3d", "classpolyfem_1_1basis_1_1_polygonal_basis3d.html", null ],

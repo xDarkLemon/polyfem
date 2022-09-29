@@ -284,8 +284,9 @@ void polyfem::utils::SpareMatrixCache::set_zero()
 
 void polyfem::utils::SpareMatrixCache::moving_values(std::vector<double>& new_values)
 {
-	values_.insert(values_.begin(), std::make_move_iterator(new_values.begin()), 
-                    std::make_move_iterator(new_values.end()));
+	values_.swap(new_values);
+//	values_.insert(values_.begin(), std::make_move_iterator(new_values.begin()), 
+//                   std::make_move_iterator(new_values.end()));
 	new_values.erase(new_values.begin() , new_values.end());
 }
 

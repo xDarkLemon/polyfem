@@ -9,6 +9,12 @@ namespace polyfem
 {
 	namespace assembler
 	{
+
+		struct mapping_pair
+		{
+			int first;  
+			size_t second; 
+		};	
 		//stores per elment bases evaluation
 		class ElementAssemblyValues
 		{

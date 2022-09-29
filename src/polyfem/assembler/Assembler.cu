@@ -234,16 +234,15 @@ namespace polyfem
 			const Eigen::MatrixXd &displacement,
 			SpareMatrixCache &mat_cache,
 			StiffnessMatrix &grad,
-			int *outer_index_ptr,
-			int size_outerindex,
-			int *inner_index_ptr,
-			int size_innerindex) const
+			mapping_pair **mapping) const
 		{
 			// AFTER CALLED assemble_hessian ONE TIME
+			igl::Timer timerg;
+			timerg.start();
 
 			mat_cache.init(n_basis * local_assembler_.size());
 			mat_cache.set_zero();
-
+			// THERE IS A RESET HERE
 			const int n_bases = int(bases.size());
 
 			std::vector<ElementAssemblyValues> vals_array(n_bases);
@@ -273,7 +272,7 @@ namespace polyfem
 
 			thrust::host_vector<basis::Local2Global_GPU> global_data_host(n_bases * n_loc_bases * global_vector_size);
 			thrust::device_vector<basis::Local2Global_GPU> global_data_dev(n_bases * n_loc_bases * global_vector_size);
-			//CHANGE THIS TO WHATEVER
+
 			thrust::host_vector<Eigen::Matrix<double, -1, 1, 0, 3, 1>> da_host(n_bases);
 			//
 			for (int e = 0; e < n_bases; ++e)
@@ -336,10 +335,15 @@ namespace polyfem
 			double *lambda_ptr = thrust::raw_pointer_cast(lambda_array.data());
 			double *mu_ptr = thrust::raw_pointer_cast(mu_array.data());
 
-			//SET UP MOVING VALUES FUNC (INNER AND OUTER INDEX ALREADY SENT TO GPU)
-
-			std::vector<double> computed_values(mat_cache.non_zeros(), 0);
+			//SET UP MOVING VALUES FUNC (MAPPING ALREADY SENT TO GPU)
 			//
+			// LETS OVERLAP DATA TRANSFER WITH KERNEL EXEC
+			//
+			std::vector<double> computed_values(mat_cache.non_zeros(), 0);
+			timerg.stop();
+			logger().trace("done memory allocations for Assembly Hessian {}s...", timerg.getElapsedTime());
+
+			timerg.start();
 			computed_values = local_assembler_.assemble_hessian_GPU(displacement_dev_ptr,
 																	jac_it_dev_ptr,
 																	global_data_dev_ptr,
@@ -351,20 +355,23 @@ namespace polyfem
 																	n_pts,
 																	lambda_ptr,
 																	mu_ptr,
-																	outer_index_ptr,
-																	size_outerindex,
-																	inner_index_ptr,
-																	size_innerindex);
+																	mat_cache.non_zeros(),
+																	mapping);
 			//computed_values);
 			//
+
 			//			// WE NEED TO GO BACK HERE
 			//			//if (project_to_psd)
 			//			//	stiffness_val = ipc::project_to_psd(stiffness_val);
 			//
+
+			//HERE IS THE DEAL
+			timerg.stop();
+			logger().trace("done merge assembly Hessian using GPU {}s...", timerg.getElapsedTime());
+
 			mat_cache.moving_values(computed_values);
-			//mat_cache.print_values();
-			//
 			grad = mat_cache.get_matrix();
+
 			return;
 		}
 

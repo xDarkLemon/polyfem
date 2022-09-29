@@ -70,6 +70,7 @@ namespace polyfem
 
 			const std::vector<int> &inner_index_to_gpu() const { return inner_index_; }
 			const std::vector<int> &outer_index_to_gpu() const { return outer_index_; }
+			const std::vector<std::vector<std::pair<int, size_t>>> &mapping_to_gpu() const { return mapping_; }
 
 		private:
 			size_t size_;

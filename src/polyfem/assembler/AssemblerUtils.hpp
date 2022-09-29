@@ -22,6 +22,8 @@
 #include "NavierStokes.hpp"
 #include "IncompressibleLinElast.hpp"
 
+#include "CUDA_utilities.cuh"
+
 #include <polyfem/utils/MatrixUtils.hpp>
 
 #include <vector>
@@ -166,7 +168,7 @@ namespace polyfem
 
 			bool has_damping() const;
 
-			//gets the names of all assemblers
+			// gets the names of all assemblers
 			static std::vector<std::string> scalar_assemblers();
 			static std::vector<std::string> tensor_assemblers();
 			// const std::vector<std::string> &mixed_assemblers() const { return mixed_assemblers_; }

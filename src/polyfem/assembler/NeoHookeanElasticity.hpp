@@ -35,14 +35,12 @@ namespace polyfem::assembler
 												 Eigen::Matrix<double, -1, -1, 0, 3, 3> *grad_dev_ptr,
 												 int n_bases,
 												 int n_loc_bases,
-												 int global_vector_size,
+												 int global_columns_N,
 												 int n_pts,
-												 double *lambda,
-												 double *mu,
-												 int *outer_index,
-												 int size_outer,
-												 int *inner_index,
-												 int size_inner) const;
+												 double *lambda_ptr,
+												 double *mu_ptr,
+												 int non_zeros,
+												 mapping_pair **mapping) const;
 
 		Eigen::VectorXd assemble_grad_GPU(double *displacement_dev_ptr,
 										  Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, 0, 3, 3> *jac_it_dev_ptr,

@@ -1,9 +1,8 @@
 #include <polyfem/assembler/AssemblerUtils.hpp>
 #include <polyfem/utils/Logger.hpp>
-#include <thrust/device_vector.h>
-#include <thrust/copy.h>
-#include <thrust/host_vector.h>
 #include <unsupported/Eigen/SparseExtra>
+
+#include <igl/Timer.h>
 
 namespace polyfem
 {
@@ -301,10 +300,79 @@ namespace polyfem
 													 utils::SpareMatrixCache &mat_cache,
 													 StiffnessMatrix &hessian) const
 		{
+			igl::Timer timerg;
 			if (assembler == "SaintVenant")
 				saint_venant_elasticity_.assemble_hessian(is_volume, n_basis, project_to_psd, bases, gbases, cache, dt, displacement, displacement_prev, mat_cache, hessian);
+#ifdef USE_GPU
+			else if (assembler == "NeoHookean")
+			{
+				static mapping_pair **mapping_gpu_dev = nullptr;
+				static int flag_gpu_settings = 0;
+				if (!flag_gpu_settings)
+				{
+					size_t free_bytes = 0, total_bytes = 0;
+					cudaMemGetInfo(&free_bytes, &total_bytes);
+					std::cout << "Mem GPU Free : " << free_bytes << " bytes" << std::endl;
+					std::cout << "Mem GPU Total: " << total_bytes << " bytes" << std::endl;
+					size_t sizeLimit = 0;
+					cudaDeviceGetLimit(&sizeLimit, cudaLimitMallocHeapSize);
+					std::cout << "Original device heap sizeLimit: " << sizeLimit << std::endl;
+
+					// cudaDeviceSetLimit( cudaLimitMallocHeapSize, free_bytes );
+
+					// cudaDeviceGetLimit( &sizeLimit, cudaLimitMallocHeapSize );
+					// std::cout << "Current device heap sizeLimit: " << sizeLimit << std::endl;
+					/*
+					std::cout << "SharedMemoryRequired: "
+					  << ":" << size_inner_index*sizeof(double)
+					  << std::endl;
+					*/
+					flag_gpu_settings++;
+				}
+
+				if (!mat_cache.non_zeros())
+				{
+					timerg.start();
+					neo_hookean_elasticity_.assemble_hessian(is_volume, n_basis, project_to_psd, bases, gbases, cache, dt, displacement, displacement_prev, mat_cache, hessian);
+
+					auto mapping = mat_cache.mapping_to_gpu();
+					int size_rows = mapping.size();
+					std::vector<mapping_pair *> mapping_gpu(size_rows);
+
+					// NEEDS TO BE FREED?
+					mapping_gpu_dev = ALLOCATE_GPU(mapping_gpu_dev, sizeof(mapping_pair *) * size_rows);
+
+					for (int i = 0; i < size_rows; i++)
+					{
+						int size_val = mapping[i].size();
+						std::vector<mapping_pair> vec_pair(size_val);
+
+						mapping_gpu[i] = ALLOCATE_GPU(mapping_gpu[i], sizeof(mapping_pair) * size_val);
+
+						for (int j = 0; j < size_val; j++)
+						{
+							vec_pair[j].first = mapping[i][j].first;
+							vec_pair[j].second = mapping[i][j].second;
+						}
+
+						COPYDATATOGPU(mapping_gpu[i], vec_pair.data(), sizeof(mapping_pair) * size_val);
+						cudaDeviceSynchronize();
+						vec_pair.resize(0);
+					}
+
+					COPYDATATOGPU(mapping_gpu_dev, mapping_gpu.data(), sizeof(mapping_pair *) * size_rows);
+					cudaDeviceSynchronize();
+					timerg.stop();
+					logger().trace("done mapping and transfer calculation to GPU {}s...", timerg.getElapsedTime());
+					return;
+				}
+				neo_hookean_elasticity_.assemble_hessian_GPU(is_volume, n_basis, project_to_psd, bases, gbases, cache, displacement, mat_cache, hessian, mapping_gpu_dev);
+			}
+#endif
+#ifndef USE_GPU
 			else if (assembler == "NeoHookean")
 				neo_hookean_elasticity_.assemble_hessian(is_volume, n_basis, project_to_psd, bases, gbases, cache, dt, displacement, displacement_prev, mat_cache, hessian);
+#endif
 			else if (assembler == "MultiModels")
 				multi_models_elasticity_.assemble_hessian(is_volume, n_basis, project_to_psd, bases, gbases, cache, dt, displacement, displacement_prev, mat_cache, hessian);
 			else if (assembler == "Damping")

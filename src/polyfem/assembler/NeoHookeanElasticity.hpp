@@ -42,10 +42,8 @@ namespace polyfem
 													 int n_pts,
 													 double *lambda_ptr,
 													 double *mu_ptr,
-													 int *outer_index,
-													 int size_outer,
-													 int *inner_index,
-													 int size_inner) const;
+													 int non_zeros,
+													 mapping_pair **mapping) const;
 			//std::vector<double> &computed_values) const;
 
 			Eigen::VectorXd assemble_grad(const ElementAssemblyValues &vals, const Eigen::MatrixXd &displacement, const QuadratureVector &da) const;
@@ -66,8 +64,6 @@ namespace polyfem
 											  int n_basis) const;
 
 			double compute_energy(const ElementAssemblyValues &vals, const Eigen::MatrixXd &displacement, const QuadratureVector &da) const;
-
-			void print_test_wrapper(int *outer, int n_outer, int *inner, int n_inner) const;
 
 			int compute_energy_gpu(double *displacement_dev_ptr,
 								   Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, 0, 3, 3> *jac_it_dev_ptr,

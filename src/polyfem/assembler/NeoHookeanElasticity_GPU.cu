@@ -11,7 +11,7 @@ namespace polyfem
 
 	namespace assembler
 	{
-
+		/*
 		__device__ int kernel_mapping(int *outer, int size_outer, int *inner, int size_inner, int i, int j)
 		{
 			int index = -1;
@@ -51,6 +51,21 @@ namespace polyfem
 			} while (last_col < j);
 
 			return index;
+		}
+		*/
+
+		//ADD A MAX _ VAL OR STOP CONDITION FOR SECURITY
+		__device__ int kernel_mapping(mapping_pair **mapping, int i, int j)
+		{
+			int k = 0;
+			do
+			{
+				if (mapping[i][k].first == j)
+				{
+					return mapping[i][k].second;
+				}
+				k++;
+			} while (1);
 		}
 
 		template <typename T>
@@ -333,41 +348,37 @@ namespace polyfem
 		}
 
 		template <int n_basis, int dim>
-		__global__ void compute_energy_hessian_aux_fast_GPU(double *displacement,
+		__global__ void compute_energy_hessian_aux_fast_GPU(int it_index,
+															double *displacement,
 															Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, 0, 3, 3> *jac_it_array,
 															Local2Global_GPU *global_data,
 															Eigen::Matrix<double, -1, 1, 0, 3, 1> *da,
 															Eigen::Matrix<double, -1, -1, 0, 3, 3> *grad_v,
 															int n_bases,
+															int partial_bases,
 															int n_loc_bases,
 															int global_vector_size,
 															int n_pts,
 															int size_,
 															double *lambda,
 															double *mu,
-															int *outer,
-															int size_outer,
-															int *inner,
-															int size_inner,
+															mapping_pair **mapping,
 															double *computed_values)
 		{
 			//constexpr int N = (n_basis == Eigen::Dynamic) ? Eigen::Dynamic : n_basis * dim;
-			//const int n_pts = da.size();
-			Eigen::Matrix<double, -1, -1> thread_values(size_inner, 1);
-			thread_values.setZero();
-
-			extern __shared__ double shared_values[];
 
 			int bx = blockIdx.x;
 			int tx = threadIdx.x;
-			int b_index = bx * NUMBER_THREADS + tx;
+			int t_index = bx * NUMBER_THREADS + tx;
+			int b_index = bx * NUMBER_THREADS + tx + it_index * partial_bases;
 
-			//EACH THREAD SHOULD HAVE ITS OWN HESSIAN
-			Eigen::Matrix<double, -1, -1, 0, n_basis * dim, n_basis * dim> H(n_basis * dim, n_basis * dim);
-			H.setZero();
+			int thread_boundary = ((n_bases - partial_bases * (it_index + 2)) >= 0) ? partial_bases : n_bases - partial_bases * it_index;
 
-			if (b_index < n_bases)
+			if (b_index < n_bases && t_index < thread_boundary)
 			{
+				Eigen::Matrix<double, -1, -1, 0, n_basis * dim, n_basis * dim> H(n_basis * dim, n_basis * dim);
+				H.setZero();
+
 				Eigen::Matrix<double, n_basis, dim> local_disp(n_loc_bases, size_);
 				local_disp.setZero();
 
@@ -471,7 +482,8 @@ namespace polyfem
 
 					H += hessian * da[b_index](p);
 				}
-				//syncthreads
+
+				//syncthreads?
 				for (int i = 0; i < n_loc_bases; ++i)
 				{
 					for (int j = 0; j < n_loc_bases; ++j)
@@ -490,48 +502,18 @@ namespace polyfem
 									{
 										const auto gj = global_data[b_index * n_loc_bases * global_vector_size + j * global_vector_size + jj].index * size_ + n;
 										const auto wj = global_data[b_index * n_loc_bases * global_vector_size + j * global_vector_size + jj].val;
-										const auto val_index = kernel_mapping(outer, size_outer, inner, size_inner, gi, gj);
+										const auto val_index = kernel_mapping(mapping, gi, gj);
 
-										thread_values(val_index) += local_value * wi * wj;
+										atomicAdd(&computed_values[val_index], local_value * wi * wj);
 									}
 								}
 							}
 						}
 					}
 				}
-
-				typedef cub::BlockReduce<double, 32> BlockReduce;
-				// Allocate shared memory for BlockReduce
-				__shared__ typename BlockReduce::TempStorage temp_storage;
-
-				for (int i = 0; i < size_inner; i++)
-				{
-					double result_ = BlockReduce(temp_storage).Sum(thread_values(i));
-					if (tx == 0)
-					{
-						shared_values[i] = result_;
-						atomicAdd(&computed_values[i], shared_values[i]);
-					}
-				}
 			}
 		}
 
-		__global__ void print_test(int *outer, int size_outer, int *inner, int size_inner)
-		{
-			int n1 = 0, n2 = 0, n3 = 0, n4 = 0;
-			n1 = kernel_mapping(outer, size_outer, inner, size_inner, 0, 1);
-			printf("\n %d %d %d %d\n", n1, n2, n3, n4);
-		}
-		__global__ void test_values_ext(double *values)
-		{
-			for (int i = 0; i < 2700; i++)
-				values[i] = 1 + i;
-		}
-
-		void NeoHookeanElasticity::print_test_wrapper(int *outer, int size_outer, int *inner, int size_inner) const
-		{
-			print_test<<<1, 1>>>(outer, size_outer, inner, size_inner);
-		}
 		int NeoHookeanElasticity::compute_energy_gpu(double *displacement_dev_ptr,
 													 Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, 0, 3, 3> *jac_it_dev_ptr,
 													 Local2Global *global_data_dev_ptr,
@@ -635,173 +617,166 @@ namespace polyfem
 												   int n_pts,
 												   double *lambda,
 												   double *mu,
-												   int *outer_index,
-												   int size_outer,
-												   int *inner_index,
-												   int size_inner) const
+												   int non_zeros,
+												   mapping_pair **mapping) const
 		//									   std::vector<double> &computed_values) const
 		{
-			std::vector<double> computed_values(size_inner, 0);
+			std::vector<double> computed_values(non_zeros, 0);
 
 			thrust::device_vector<double> computed_values_dev(computed_values.begin(), computed_values.end());
 			double *computed_values_ptr = thrust::raw_pointer_cast(computed_values_dev.data());
-			int const sharedMemoryBytes{size_inner * sizeof(double)};
+			//			long double slice = ((long double)n_bases * size_inner * sizeof(double)) / (12e9);
+			long double slice = 0.99; //NEED TO CALCULATE MAX ALLOCATION POSSIBLE
+			int iterations = (slice > 1) ? slice + 1 : 1;
+			//	int const sharedMemoryBytes{size_inner * sizeof(double)};
+			int partial_bases = n_bases / iterations;
 
-			int grid = (n_bases % NUMBER_THREADS == 0) ? n_bases / NUMBER_THREADS : n_bases / NUMBER_THREADS + 1;
-			int threads = (n_bases > NUMBER_THREADS) ? NUMBER_THREADS : n_bases;
-
-			std::cout << "SharedMemoryRequired: "
-					  << ":" << sharedMemoryBytes
-					  << std::endl;
+			//Limitation of the GPU memory
 
 			//Eigen::Matrix<double, -1, -1, 0, x, x>> hessian;
-			if (size() == 2)
+			for (int it = 0; it < iterations; it++)
 			{
-				if (n_loc_bases == 3)
+				auto threads__ = ((n_bases - partial_bases * (it + 2)) >= 0) ? partial_bases : n_bases - partial_bases * it;
+				int grid = (threads__ % NUMBER_THREADS == 0) ? threads__ / NUMBER_THREADS : threads__ / NUMBER_THREADS + 1;
+				int threads = (threads__ > NUMBER_THREADS) ? NUMBER_THREADS : threads__;
+
+				if (size() == 2)
 				{
-					//	Eigen::Matrix<double, -1, -1, 0, 6, 6> hessian;
-					//	hessian.setZero();
-					//	thrust::device_vector<Eigen::Matrix<double, -1, -1, 0, 6, 6>> hessian_dev(1);
-					//	hessian_dev[0] = hessian;
-					//	Eigen::Matrix<double, -1, -1, 0, 6, 6> *hessian_ptr = thrust::raw_pointer_cast(hessian_dev.data());
-					compute_energy_hessian_aux_fast_GPU<3, 2><<<grid, threads, size_inner * sizeof(double)>>>(displacement_dev_ptr,
-																											  jac_it_dev_ptr,
-																											  global_data_dev_ptr,
-																											  da_dev_ptr,
-																											  grad_dev_ptr,
-																											  n_bases,
-																											  n_loc_bases,
-																											  global_vector_size,
-																											  n_pts,
-																											  size(),
-																											  lambda,
-																											  mu,
-																											  outer_index,
-																											  size_outer,
-																											  inner_index,
-																											  size_inner,
-																											  computed_values_ptr);
+					if (n_loc_bases == 3)
+					{
+						//	Eigen::Matrix<double, -1, -1, 0, 6, 6> hessian;
+						//	hessian.setZero();
+						//	thrust::device_vector<Eigen::Matrix<double, -1, -1, 0, 6, 6>> hessian_dev(1);
+						//	hessian_dev[0] = hessian;
+						//	Eigen::Matrix<double, -1, -1, 0, 6, 6> *hessian_ptr = thrust::raw_pointer_cast(hessian_dev.data());
+						compute_energy_hessian_aux_fast_GPU<3, 2><<<grid, threads>>>(it,
+																					 displacement_dev_ptr,
+																					 jac_it_dev_ptr,
+																					 global_data_dev_ptr,
+																					 da_dev_ptr,
+																					 grad_dev_ptr,
+																					 n_bases,
+																					 partial_bases,
+																					 n_loc_bases,
+																					 global_vector_size,
+																					 n_pts,
+																					 size(),
+																					 lambda,
+																					 mu,
+																					 mapping,
+																					 computed_values_ptr);
+					}
+					else if (n_loc_bases == 6)
+					{
+						compute_energy_hessian_aux_fast_GPU<6, 2><<<grid, threads>>>(it,
+																					 displacement_dev_ptr,
+																					 jac_it_dev_ptr,
+																					 global_data_dev_ptr,
+																					 da_dev_ptr,
+																					 grad_dev_ptr,
+																					 n_bases,
+																					 partial_bases,
+																					 n_loc_bases,
+																					 global_vector_size,
+																					 n_pts,
+																					 size(),
+																					 lambda,
+																					 mu,
+																					 mapping,
+																					 computed_values_ptr);
+					}
+					else if (n_loc_bases == 10)
+					{
+						compute_energy_hessian_aux_fast_GPU<10, 2><<<grid, threads>>>(it,
+																					  displacement_dev_ptr,
+																					  jac_it_dev_ptr,
+																					  global_data_dev_ptr,
+																					  da_dev_ptr,
+																					  grad_dev_ptr,
+																					  n_bases,
+																					  partial_bases,
+																					  n_loc_bases,
+																					  global_vector_size,
+																					  n_pts,
+																					  size(),
+																					  lambda,
+																					  mu,
+																					  mapping,
+																					  computed_values_ptr);
+					}
 				}
-				else if (n_loc_bases == 6)
+				else
 				{
-					compute_energy_hessian_aux_fast_GPU<6, 2><<<grid, threads, size_inner * sizeof(double)>>>(displacement_dev_ptr,
-																											  jac_it_dev_ptr,
-																											  global_data_dev_ptr,
-																											  da_dev_ptr,
-																											  grad_dev_ptr,
-																											  n_bases,
-																											  n_loc_bases,
-																											  global_vector_size,
-																											  n_pts,
-																											  size(),
-																											  lambda,
-																											  mu,
-																											  outer_index,
-																											  size_outer,
-																											  inner_index,
-																											  size_inner,
-																											  computed_values_ptr);
+					assert(size() == 3);
+					if (n_loc_bases == 4)
+					{
+
+						// ADD A KERNEL WRAPPER
+						//compute_energy_hessian_aux_fast_GPU<4, 3><<<grid, threads, sharedMemoryBytes>>>(displacement_dev_ptr,
+						compute_energy_hessian_aux_fast_GPU<4, 3><<<grid, threads>>>(it,
+																					 displacement_dev_ptr,
+																					 jac_it_dev_ptr,
+																					 global_data_dev_ptr,
+																					 da_dev_ptr,
+																					 grad_dev_ptr,
+																					 n_bases,
+																					 partial_bases,
+																					 n_loc_bases,
+																					 global_vector_size,
+																					 n_pts,
+																					 size(),
+																					 lambda,
+																					 mu,
+																					 mapping,
+																					 computed_values_ptr);
+					}
+					else if (n_loc_bases == 10)
+					{
+						compute_energy_hessian_aux_fast_GPU<10, 3><<<grid, threads>>>(it,
+																					  displacement_dev_ptr,
+																					  jac_it_dev_ptr,
+																					  global_data_dev_ptr,
+																					  da_dev_ptr,
+																					  grad_dev_ptr,
+																					  n_bases,
+																					  partial_bases,
+																					  n_loc_bases,
+																					  global_vector_size,
+																					  n_pts,
+																					  size(),
+																					  lambda,
+																					  mu,
+																					  mapping,
+																					  computed_values_ptr);
+					}
+					else if (n_loc_bases == 20)
+					{
+						compute_energy_hessian_aux_fast_GPU<20, 3><<<grid, threads>>>(it,
+																					  displacement_dev_ptr,
+																					  jac_it_dev_ptr,
+																					  global_data_dev_ptr,
+																					  da_dev_ptr,
+																					  grad_dev_ptr,
+																					  n_bases,
+																					  partial_bases,
+																					  n_loc_bases,
+																					  global_vector_size,
+																					  n_pts,
+																					  size(),
+																					  lambda,
+																					  mu,
+																					  mapping,
+																					  computed_values_ptr);
+					}
 				}
-				else if (n_loc_bases == 10)
-				{
-					compute_energy_hessian_aux_fast_GPU<10, 2><<<grid, threads, size_inner * sizeof(double)>>>(displacement_dev_ptr,
-																											   jac_it_dev_ptr,
-																											   global_data_dev_ptr,
-																											   da_dev_ptr,
-																											   grad_dev_ptr,
-																											   n_bases,
-																											   n_loc_bases,
-																											   global_vector_size,
-																											   n_pts,
-																											   size(),
-																											   lambda,
-																											   mu,
-																											   outer_index,
-																											   size_outer,
-																											   inner_index,
-																											   size_inner,
-																											   computed_values_ptr);
-				}
-			}
-			else
-			{
-				assert(size() == 3);
-				if (n_loc_bases == 4)
-				{
-					CHECK_CUDA_ERROR(cudaFuncSetAttribute(
-						compute_energy_hessian_aux_fast_GPU<4, 3>,
-						cudaFuncAttributeMaxDynamicSharedMemorySize, sharedMemoryBytes));
-					// ADD A KERNEL WRAPPER
-					compute_energy_hessian_aux_fast_GPU<4, 3><<<grid, threads, sharedMemoryBytes>>>(displacement_dev_ptr,
-																									jac_it_dev_ptr,
-																									global_data_dev_ptr,
-																									da_dev_ptr,
-																									grad_dev_ptr,
-																									n_bases,
-																									n_loc_bases,
-																									global_vector_size,
-																									n_pts,
-																									size(),
-																									lambda,
-																									mu,
-																									outer_index,
-																									size_outer,
-																									inner_index,
-																									size_inner,
-																									computed_values_ptr);
-				}
-				else if (n_loc_bases == 10)
-				{
-					compute_energy_hessian_aux_fast_GPU<10, 3><<<grid, threads, size_inner * sizeof(double)>>>(displacement_dev_ptr,
-																											   jac_it_dev_ptr,
-																											   global_data_dev_ptr,
-																											   da_dev_ptr,
-																											   grad_dev_ptr,
-																											   n_bases,
-																											   n_loc_bases,
-																											   global_vector_size,
-																											   n_pts,
-																											   size(),
-																											   lambda,
-																											   mu,
-																											   outer_index,
-																											   size_outer,
-																											   inner_index,
-																											   size_inner,
-																											   computed_values_ptr);
-				}
-				else if (n_loc_bases == 20)
-				{
-					compute_energy_hessian_aux_fast_GPU<20, 3><<<grid, threads, size_inner * sizeof(double)>>>(displacement_dev_ptr,
-																											   jac_it_dev_ptr,
-																											   global_data_dev_ptr,
-																											   da_dev_ptr,
-																											   grad_dev_ptr,
-																											   n_bases,
-																											   n_loc_bases,
-																											   global_vector_size,
-																											   n_pts,
-																											   size(),
-																											   lambda,
-																											   mu,
-																											   outer_index,
-																											   size_outer,
-																											   inner_index,
-																											   size_inner,
-																											   computed_values_ptr);
-				}
+				gpuErrchk(cudaPeekAtLastError());
+				CHECK_CUDA_ERROR(cudaDeviceSynchronize());
 			}
 			//CHECK_LAST_CUDA_ERROR();
 
-			gpuErrchk(cudaPeekAtLastError());
-			CHECK_CUDA_ERROR(cudaDeviceSynchronize());
 			//gpuErrchk(cudaDeviceSynchronize());
 			thrust::copy(computed_values_dev.begin(), computed_values_dev.end(), computed_values.begin());
-			// empty the vector
-			//computed_values_dev.clear();
 
-			// deallocate any capacity which may currently be associated with vec
-			//computed_values.shrink_to_fit();
 			return computed_values;
 		}
 

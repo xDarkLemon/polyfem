@@ -112,10 +112,7 @@ namespace polyfem
 				const Eigen::MatrixXd &displacement,
 				utils::SpareMatrixCache &mat_cache,
 				StiffnessMatrix &grad,
-				int *outer_ptr,
-				int size_outer,
-				int *inner_ptr,
-				int size_inner) const;
+				mapping_pair **mapping) const;
 
 			//assemble energy
 			double assemble(

@@ -5,6 +5,8 @@
 #include <thrust/host_vector.h>
 #include <unsupported/Eigen/SparseExtra>
 
+#include <igl/Timer.h>
+
 namespace polyfem
 {
 	using namespace basis;
@@ -301,14 +303,15 @@ namespace polyfem
 													 utils::SpareMatrixCache &mat_cache,
 													 StiffnessMatrix &hessian) const
 		{
+			igl::Timer timerg;
 			if (assembler == "SaintVenant")
 				saint_venant_elasticity_.assemble_hessian(is_volume, n_basis, project_to_psd, bases, gbases, cache, dt, displacement, displacement_prev, mat_cache, hessian);
 #ifdef USE_GPU
 			else if (assembler == "NeoHookean")
 			{
 				static mapping_pair **mapping_gpu_dev = nullptr;
-				static int flag_cache_compute = 0;
-				if (!flag_cache_compute)
+				static int flag_gpu_settings = 0;
+				if (!flag_gpu_settings)
 				{
 					size_t free_bytes = 0, total_bytes = 0;
 					cudaMemGetInfo(&free_bytes, &total_bytes);
@@ -327,18 +330,19 @@ namespace polyfem
 					  << ":" << size_inner_index*sizeof(double)
 					  << std::endl;
 					*/
-					flag_cache_compute++;
+					flag_gpu_settings++;
 				}
 
 				if (!mat_cache.non_zeros())
 				{
+					timerg.start();
 					neo_hookean_elasticity_.assemble_hessian(is_volume, n_basis, project_to_psd, bases, gbases, cache, displacement, mat_cache, hessian);
 
 					auto mapping = mat_cache.mapping_to_gpu();
 					int size_rows = mapping.size();
 					std::vector<mapping_pair *> mapping_gpu(size_rows);
 
-					// NEEDS TO BE FREED
+					// NEEDS TO BE FREED?
 					mapping_gpu_dev = ALLOCATE_GPU(mapping_gpu_dev, sizeof(mapping_pair *) * size_rows);
 
 					for (int i = 0; i < size_rows; i++)
@@ -360,6 +364,9 @@ namespace polyfem
 					}
 
 					COPYDATATOGPU(mapping_gpu_dev, mapping_gpu.data(), sizeof(mapping_pair *) * size_rows);
+					cudaDeviceSynchronize();
+					timerg.stop();
+					logger().trace("done mapping and transfer calculation to GPU {}s...", timerg.getElapsedTime());
 					return;
 				}
 				neo_hookean_elasticity_.assemble_hessian_GPU(is_volume, n_basis, project_to_psd, bases, gbases, cache, displacement, mat_cache, hessian, mapping_gpu_dev);

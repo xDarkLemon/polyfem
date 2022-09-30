@@ -400,7 +400,8 @@ namespace polyfem
 					Eigen::Matrix<double, n_basis, dim> grad(n_loc_bases, size_);
 					for (size_t i = 0; i < n_loc_bases; ++i)
 					{
-						grad.row(i) = grad_v[b_index * n_loc_bases * n_pts + i * n_pts].row(p);
+						//grad.row(i) = grad_v[b_index * n_loc_bases * n_pts + i * n_pts].row(p); //ORIGINAL
+						grad.row(i) = grad_v[b_index * n_loc_bases * n_pts + i * n_pts].col(p);
 					}
 					Eigen::Matrix<double, dim, dim> jac_it;
 					for (long k = 0; k < jac_it.size(); ++k)

@@ -458,7 +458,7 @@ namespace polyfem
 
 					Eigen::Matrix<double, dim * dim, 1> g_j = Eigen::Map<const Eigen::Matrix<double, dim * dim, 1>>(delJ_delF.data(), delJ_delF.size());
 
-					Eigen::Matrix<double, dim * dim, dim *dim> hessian_temp = (mu[p] * id) + (((mu[p] + lambda[p] * (1 - log_det_j)) / (J * J)) * (g_j * g_j.transpose())) + (((lambda[p] * log_det_j - mu[p]) / (J)) * del2J_delF2);
+					Eigen::Matrix<double, dim * dim, dim *dim> hessian_temp = (mu[b_index * n_pts + p] * id) + (((mu[b_index * n_pts + p] + lambda[b_index * n_pts + p] * (1 - log_det_j)) / (J * J)) * (g_j * g_j.transpose())) + (((lambda[b_index * n_pts + p] * log_det_j - mu[b_index * n_pts + p]) / (J)) * del2J_delF2);
 
 					// NOT DYNAMIC YET (n_basis * dim <--> N)
 					Eigen::Matrix<double, dim * dim, n_basis * dim> delF_delU_tensor(jac_it.size(), grad.size());
@@ -479,7 +479,7 @@ namespace polyfem
 					// NOT DYNAMIC YET (n_basis * dim <--> N)
 					Eigen::Matrix<double, n_basis * dim, n_basis *dim> hessian = delF_delU_tensor.transpose() * hessian_temp * delF_delU_tensor;
 
-					double val = mu[p] / 2 * ((def_grad.transpose() * def_grad).trace() - size_ - 2 * log_det_j) + lambda[p] / 2 * log_det_j * log_det_j;
+					double val = mu[b_index * n_pts + p] / 2 * ((def_grad.transpose() * def_grad).trace() - size_ - 2 * log_det_j) + lambda[b_index * n_pts + p] / 2 * log_det_j * log_det_j;
 
 					H += hessian * da[b_index](p);
 				}

@@ -324,24 +324,27 @@ namespace polyfem
 						//						for (int p = 0; p < n_pts; p++)
 						//						{
 						Eigen::Matrix<double, -1, -1, 0, 3, 3> row_(Eigen::Map<Eigen::Matrix<double, -1, -1, 0, 3, 3>>(vals_array[e].basis_values[f].grad.data(), 3, 3));
-						COPYDATATOGPU(grad_dev_ptr + e * n_loc_bases * n_pts + f * n_pts, &row_, sizeof(Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, 0, 3, 3>));
+						COPYDATATOGPU(grad_dev_ptr + e * n_loc_bases + f, &row_, sizeof(Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, 0, 3, 3>));
 						//grad_dev[e * n_loc_bases * n_pts + f * n_pts + p] = vals_array[e].basis_values[f].grad.row(p);
 						//						}
 					}
 				}
 				double lambda, mu;
-				lambda_ptr = ALLOCATE_GPU(lambda_ptr, sizeof(double) * n_pts);
-				mu_ptr = ALLOCATE_GPU(mu_ptr, sizeof(double) * n_pts);
+				lambda_ptr = ALLOCATE_GPU(lambda_ptr, sizeof(double) * n_bases * n_pts);
+				mu_ptr = ALLOCATE_GPU(mu_ptr, sizeof(double) * n_bases * n_pts);
 
 				//				thrust::device_vector<double> lambda_array(n_pts);
 				//				thrust::device_vector<double> mu_array(n_pts);
-				for (int p = 0; p < n_pts; p++)
+				for (int e = 0; e < n_bases; ++e)
 				{
-					local_assembler_.get_lambda_mu(vals_array[0].quadrature.points.row(p), vals_array[0].val.row(p), vals_array[0].element_id, lambda, mu);
-					COPYDATATOGPU(lambda_ptr + p, &lambda, sizeof(double));
-					COPYDATATOGPU(mu_ptr + p, &mu, sizeof(double));
-					//lambda_array[p] = lambda;
-					//mu_array[p] = mu;
+					for (int p = 0; p < n_pts; p++)
+					{
+						local_assembler_.get_lambda_mu(vals_array[e].quadrature.points.row(p), vals_array[e].val.row(p), vals_array[e].element_id, lambda, mu);
+						COPYDATATOGPU(lambda_ptr + e * n_pts + p, &lambda, sizeof(double));
+						COPYDATATOGPU(mu_ptr + e * n_pts + p, &mu, sizeof(double));
+						//lambda_array[p] = lambda;
+						//mu_array[p] = mu;
+					}
 				}
 				cudaDeviceSynchronize();
 				timerg.stop();

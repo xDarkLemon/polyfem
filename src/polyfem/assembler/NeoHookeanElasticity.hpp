@@ -44,10 +44,8 @@ namespace polyfem::assembler
 												 int n_pts,
 												 double *lambda_ptr,
 												 double *mu_ptr,
-												 int *outer_index,
-												 int size_outer,
-												 int *inner_index,
-												 int size_inner) const;
+												 int non_zeros,
+												 mapping_pair **mapping) const;
 		// std::vector<double> &computed_values) const;
 
 		//			template <typename T>

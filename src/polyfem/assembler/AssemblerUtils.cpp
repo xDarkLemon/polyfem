@@ -336,7 +336,7 @@ namespace polyfem
 				if (!mat_cache.non_zeros())
 				{
 					timerg.start();
-					neo_hookean_elasticity_.assemble_hessian(is_volume, n_basis, project_to_psd, bases, gbases, cache, displacement, mat_cache, hessian);
+					neo_hookean_elasticity_.assemble_hessian(is_volume, n_basis, project_to_psd, bases, gbases, cache, dt, displacement, displacement_prev, mat_cache, hessian);
 
 					auto mapping = mat_cache.mapping_to_gpu();
 					int size_rows = mapping.size();

@@ -7,6 +7,7 @@ set(test_sources
 	test_assembler.cpp
 	test_bases.cpp
 	test_matrix.cpp
+  test_cmesh.cpp
   test_ncmesh.cpp
 	test_normal.cpp
 	test_problem.cpp
@@ -15,6 +16,7 @@ set(test_sources
 	test_solver.cpp
 	test_tbb.cpp
 	test_utils.cpp
+  test_form_derivatives.cpp
   verify_run.cpp
 )
 
@@ -27,10 +29,13 @@ add_executable(unit_tests ${test_sources})
 target_link_libraries(unit_tests PUBLIC polyfem::polyfem)
 target_link_libraries(unit_tests PUBLIC -lcublas -lcurand)
 
-target_link_libraries(unit_tests PUBLIC warnings::all)
+target_link_libraries(unit_tests PUBLIC polyfem::warnings)
 
 include(catch2)
 target_link_libraries(unit_tests PUBLIC Catch2::Catch2)
+
+include(finite_diff)
+target_link_libraries(unit_tests PUBLIC finitediff::finitediff)
 
 ################################################################################
 # Compiler options
@@ -38,6 +43,7 @@ target_link_libraries(unit_tests PUBLIC Catch2::Catch2)
 
 include(polyfem_data)
 target_compile_definitions(unit_tests PUBLIC -DPOLYFEM_DATA_DIR=\"${POLYFEM_DATA_DIR}\")
+target_compile_definitions(unit_tests PUBLIC -DPOLYFEM_TEST_DIR=\"${CMAKE_SOURCE_DIR}/tests\")
 
 target_compile_definitions(unit_tests PUBLIC CATCH_CONFIG_ENABLE_BENCHMARKING)
 

@@ -1,10 +1,10 @@
 ////////////////////////////////////////////////////////////////////////////////
 #include "MeshUtils.hpp"
 
+#include <polyfem/io/OBJReader.hpp>
+#include <polyfem/io/MshReader.hpp>
 #include <polyfem/utils/StringUtils.hpp>
 #include <polyfem/utils/Logger.hpp>
-#include <polyfem/utils/MshReader.hpp>
-#include <polyfem/utils/OBJ_IO.hpp>
 #include <polyfem/utils/MatrixUtils.hpp>
 #include <polyfem/utils/HashUtils.hpp>
 
@@ -25,6 +25,7 @@
 #include <geogram/basic/logger.h>
 ////////////////////////////////////////////////////////////////////////////////
 
+using namespace polyfem::io;
 using namespace polyfem::utils;
 
 bool polyfem::mesh::is_planar(const GEO::Mesh &M, const double tol)
@@ -262,8 +263,8 @@ void polyfem::mesh::compute_element_tags(const GEO::Mesh &M, std::vector<Element
 		}
 	}
 
-	//TODO what happens at the neighs?
-	//Override for simplices
+	// TODO what happens at the neighs?
+	// Override for simplices
 	for (index_t f = 0; f < M.facets.nb(); ++f)
 	{
 		if (M.facets.nb_vertices(f) == 3)
@@ -982,96 +983,6 @@ void polyfem::mesh::extract_parent_edges(const Eigen::MatrixXd &IV, const Eigen:
 
 ////////////////////////////////////////////////////////////////////////////////
 
-bool polyfem::mesh::read_fem_mesh(
-	const std::string &mesh_path,
-	Eigen::MatrixXd &vertices,
-	Eigen::MatrixXi &cells,
-	std::vector<std::vector<int>> &elements,
-	std::vector<std::vector<double>> &weights,
-	std::vector<int> &body_ids)
-{
-	vertices.resize(0, 0);
-	cells.resize(0, 0);
-	elements.clear();
-	weights.clear();
-
-	std::string lowername = mesh_path;
-	std::transform(
-		lowername.begin(), lowername.end(), lowername.begin(), ::tolower);
-
-	if (StringUtils::endswith(lowername, ".msh"))
-	{
-		if (!MshReader::load(mesh_path, vertices, cells, elements, weights, body_ids))
-		{
-			logger().error("Unable to load mesh: {}", mesh_path);
-			return false;
-		}
-	}
-	else
-	{
-		GEO::Mesh mesh;
-		if (!GEO::mesh_load(mesh_path, mesh))
-		{
-			logger().error("Unable to load mesh: {}", mesh_path);
-			return false;
-		}
-
-		int dim = is_planar(mesh) ? 2 : 3;
-		vertices.resize(mesh.vertices.nb(), dim);
-		for (int vi = 0; vi < mesh.vertices.nb(); vi++)
-		{
-			const auto &v = mesh.vertices.point(vi);
-			for (int vj = 0; vj < dim; vj++)
-			{
-				vertices(vi, vj) = v[vj];
-			}
-		}
-
-		if (mesh.cells.nb())
-		{
-			int cell_cols = mesh.cells.nb_vertices(0);
-			cells.resize(mesh.cells.nb(), cell_cols);
-			for (int ci = 0; ci < mesh.cells.nb(); ci++)
-			{
-				assert(cell_cols == mesh.cells.nb_vertices(ci));
-				for (int cj = 0; cj < mesh.cells.nb_vertices(ci); cj++)
-				{
-					cells(ci, cj) = mesh.cells.vertex(ci, cj);
-				}
-			}
-		}
-		else
-		{
-			assert(mesh.facets.nb());
-			int cell_cols = mesh.facets.nb_vertices(0);
-			cells.resize(mesh.facets.nb(), cell_cols);
-			for (int ci = 0; ci < mesh.facets.nb(); ci++)
-			{
-				assert(cell_cols == mesh.facets.nb_vertices(ci));
-				for (int cj = 0; cj < mesh.facets.nb_vertices(ci); cj++)
-				{
-					cells(ci, cj) = mesh.facets.vertex(ci, cj);
-				}
-			}
-		}
-
-		elements.resize(cells.rows());
-		for (int ci = 0; ci < cells.rows(); ci++)
-		{
-			elements[ci].resize(cells.cols());
-			for (int cj = 0; cj < cells.cols(); cj++)
-			{
-				elements[ci][cj] = cells(ci, cj);
-			}
-		}
-		weights.resize(cells.rows());
-
-		body_ids = std::vector<int>(cells.rows(), 0);
-	}
-
-	return true;
-}
-
 void find_codim_vertices(
 	const Eigen::MatrixXd &vertices,
 	const Eigen::MatrixXi &codim_edges,
@@ -1108,7 +1019,7 @@ void find_triangle_surface_from_tets(
 	const Eigen::MatrixXi &tets,
 	Eigen::MatrixXi &faces)
 {
-	std::unordered_set<Eigen::Vector3i> tri_to_tet(4 * tets.rows());
+	std::unordered_set<Eigen::Vector3i, HashMatrix> tri_to_tet(4 * tets.rows());
 	for (int i = 0; i < tets.rows(); i++)
 	{
 		tri_to_tet.emplace(tets(i, 0), tets(i, 2), tets(i, 1));
@@ -1221,7 +1132,7 @@ bool polyfem::mesh::read_surface_mesh(
 	}
 	else if (StringUtils::endswith(lowername, ".obj")) // Use specialized OBJ reader function with polyline support
 	{
-		if (!OBJReader::load(mesh_path, vertices, codim_edges, faces))
+		if (!OBJReader::read(mesh_path, vertices, codim_edges, faces))
 		{
 			logger().error("Unable to load mesh: {}", mesh_path);
 			return false;
@@ -1264,19 +1175,6 @@ bool polyfem::mesh::read_surface_mesh(
 	find_codim_vertices(vertices, codim_edges, faces, codim_vertices);
 
 	return true;
-}
-
-void polyfem::mesh::save_edges(const std::string &filename, const Eigen::MatrixXd &V, const Eigen::MatrixXi &E)
-{
-	using namespace Eigen;
-	std::ofstream out(filename);
-	if (!out.is_open())
-	{
-		throw std::runtime_error("failed to open file " + filename);
-	}
-	out << "# Vertices: " << V.rows() << "\n# Edges: " << E.rows() << "\n"
-		<< V.cast<float>().format(IOFormat(FullPrecision, DontAlignCols, " ", "\n", "v ", "", "", "\n"))
-		<< (E.array() + 1).format(IOFormat(FullPrecision, DontAlignCols, " ", "\n", "l ", "", "", "\n"));
 }
 
 int polyfem::mesh::count_faces(const int dim, const Eigen::MatrixXi &cells)
@@ -1327,4 +1225,47 @@ int polyfem::mesh::count_faces(const int dim, const Eigen::MatrixXi &cells)
 	}
 
 	return boundaries.size();
+}
+
+void polyfem::mesh::generate_edges(GEO::Mesh &M)
+{
+	using namespace GEO;
+	typedef std::pair<index_t, index_t> Edge;
+
+	if (M.edges.nb() > 0)
+		return;
+
+	M.facets.connect();
+	M.cells.connect();
+	if (M.cells.nb() != 0 && M.facets.nb() == 0)
+	{
+		M.cells.compute_borders();
+	}
+
+	// Compute a list of all the edges, and store edge index as a corner attribute
+	std::vector<std::pair<Edge, index_t>> e2c; // edge to corner id
+	for (index_t f = 0; f < M.facets.nb(); ++f)
+	{
+		for (index_t c = M.facets.corners_begin(f); c < M.facets.corners_end(f); ++c)
+		{
+			index_t v = M.facet_corners.vertex(c);
+			index_t c2 = M.facets.next_corner_around_facet(f, c);
+			index_t v2 = M.facet_corners.vertex(c2);
+			e2c.emplace_back(std::make_pair(std::min(v, v2), std::max(v, v2)), c);
+		}
+	}
+	std::sort(e2c.begin(), e2c.end());
+
+	// Assign unique id to edges
+	M.edges.clear();
+	Edge prev_e(-1, -1);
+	for (const auto &kv : e2c)
+	{
+		Edge e = kv.first;
+		if (e != prev_e)
+		{
+			M.edges.create_edge(e.first, e.second);
+			prev_e = e;
+		}
+	}
 }

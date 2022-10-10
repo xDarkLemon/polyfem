@@ -31,7 +31,7 @@ int main(int argc, char **argv)
 	command_line.add_option("--max_threads", max_threads, "Maximum number of threads");
 
 	std::string json_file = "";
-	command_line.add_option("-j,--json", json_file, "Simulation json file")->check(CLI::ExistingFile);
+	command_line.add_option("-j,--json", json_file, "Simulation JSON file")->check(CLI::ExistingFile);
 
 	std::string hdf5_file = "";
 	command_line.add_option("--hdf5", hdf5_file, "Simulation hdf5 file")->check(CLI::ExistingFile);
@@ -42,12 +42,18 @@ int main(int argc, char **argv)
 	bool is_quiet = false;
 	command_line.add_flag("--quiet", is_quiet, "Disable cout for logging");
 
+	bool is_strict = true;
+	command_line.add_flag("-s,--strict_validation,!--ns,!--no_strict_validation", is_strict, "Disables strict validation of input JSON");
+
+	bool fallback_solver = false;
+	command_line.add_flag("--enable_overwrite_solver", fallback_solver, "If solver in json is not present, falls back to default");
+
 	std::string log_file = "";
 	command_line.add_option("--log_file", log_file, "Log to a file");
 
-	const std::vector<std::string> solvers = polysolve::LinearSolver::availableSolvers();
-	std::string solver;
-	command_line.add_option("--solver", solver, "Used to print the list of linear solvers available")->check(CLI::IsMember(solvers));
+	// const std::vector<std::string> solvers = polysolve::LinearSolver::availableSolvers();
+	// std::string solver;
+	// command_line.add_option("--solver", solver, "Used to print the list of linear solvers available")->check(CLI::IsMember(solvers));
 
 	const std::vector<std::pair<std::string, spdlog::level::level_enum>>
 		SPDLOG_LEVEL_NAMES_TO_LEVELS = {
@@ -77,7 +83,7 @@ int main(int argc, char **argv)
 		if (file.is_open())
 			file >> in_args;
 		else
-			logger().error("unable to open {} file", json_file);
+			log_and_throw_error(fmt::format("unable to open {} file", json_file));
 		file.close();
 
 		if (!in_args.contains("root_path"))
@@ -107,6 +113,11 @@ int main(int argc, char **argv)
 			tmp.getDataSet("v").read(vertices[i]);
 		}
 	}
+	else
+	{
+		logger().error("No input file specified!");
+		return command_line.exit(CLI::RequiredError("--json or --hdf5"));
+	}
 
 	if (!output_dir.empty())
 	{
@@ -115,7 +126,7 @@ int main(int argc, char **argv)
 
 	State state(max_threads);
 	state.init_logger(log_file, log_level, is_quiet);
-	state.init(in_args, output_dir);
+	state.init(in_args, is_strict, output_dir, fallback_solver);
 	state.load_mesh(/*non_conforming=*/false, names, cells, vertices);
 
 	// Mesh was not loaded successfully; load_mesh() logged the error.
@@ -125,7 +136,7 @@ int main(int argc, char **argv)
 		return EXIT_FAILURE;
 	}
 
-	state.compute_mesh_stats();
+	state.stats.compute_mesh_stats(*state.mesh);
 
 	state.build_basis();
 
@@ -135,6 +146,8 @@ int main(int argc, char **argv)
 	state.solve_problem();
 
 	state.compute_errors();
+
+	logger().info("total time: {}s", state.timings.total_time());
 
 	state.save_json();
 	state.export_data();

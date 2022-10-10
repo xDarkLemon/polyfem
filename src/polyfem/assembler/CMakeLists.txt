@@ -19,8 +19,8 @@ set(SOURCES
 	Laplacian.hpp
 	LinearElasticity.cpp
 	LinearElasticity.hpp
-	MassMatrixAssembler.cpp
-	MassMatrixAssembler.hpp
+	Mass.cpp
+	Mass.hpp
 	MultiModel.cpp
 	MultiModel.hpp
 	NeoHookeanElasticity_GPU.cu
@@ -43,6 +43,8 @@ set(SOURCES
 	Problem.hpp
 	GenericProblem.cpp
 	GenericProblem.hpp
+	ViscousDamping.cpp
+	ViscousDamping.hpp
 )
 
 if(WITH_GPU)

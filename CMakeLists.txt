@@ -27,6 +27,13 @@ if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/PolyFEMOptions.cmake)
 endif()
 
 # ###############################################################################
+# CMake Policies
+# ###############################################################################
+
+# cmake_policy(VERSION 3.24)
+# cmake_policy(SET CMP0135 NEW) # https://cmake.org/cmake/help/latest/policy/CMP0135.html
+
+# ###############################################################################
 project(PolyFEM DESCRIPTION "A polyvalent C++ FEM library")
 
 # ###############################################################################
@@ -43,9 +50,9 @@ endif()
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/recipes/")
 
-#SETTING OPT 0 compiler flag for DEBUG mode
-#string(REGEX REPLACE "(\-O[011123456789])" "" CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG}")
-#set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -O0")
+# SETTING OPT 0 compiler flag for DEBUG mode
+# string(REGEX REPLACE "(\-O[011123456789])" "" CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG}")
+# set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -O0")
 
 # Color output
 include(UseColors)
@@ -74,16 +81,16 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 set(POLYFEM_SMALL_N 80 CACHE STRING "Maximum length for stack-allocated vectors (gradient + Hessian).")
 set(POLYFEM_BIG_N 1000 CACHE STRING "Maximum length for stack-allocated vectors (gradient only).")
 
-option(POLYFEM_BUILD_DOCS       "Build documentation using Doxygen" OFF)
+option(POLYFEM_BUILD_DOCS "Build documentation using Doxygen" OFF)
 
 # Polyfem options for enabling/disabling optional libraries
-option(POLYFEM_REGENERATE_AUTOGEN    "Generate the python autogen files" OFF)
+option(POLYFEM_REGENERATE_AUTOGEN "Generate the python autogen files" OFF)
 set(POLYFEM_THREADING "TBB" CACHE STRING "Multithreading library to use (options: CPP, TBB, NONE)")
 set_property(CACHE POLYFEM_THREADING PROPERTY STRINGS "CPP" "TBB" "NONE")
 
-option(POLYFEM_WITH_REMESHING "Uses VMTK for remeshing"                     OFF)
-option(POLYFEM_WITH_TESTS     "Build tests"                                 ON)
-option(POLYFEM_WITH_CLIPPER   "Use clipper, necessary for polygonal bases"  ON)
+option(POLYFEM_WITH_REMESHING "Uses VMTK for remeshing" OFF)
+option(POLYFEM_WITH_TESTS "Build tests" ON)
+option(POLYFEM_WITH_CLIPPER "Use clipper, necessary for polygonal bases" ON)
 
 # Solver
 option(POLYSOLVE_WITH_CHOLMOD "Enable Cholmod library" ON)
@@ -104,7 +111,6 @@ if(CMAKE_OSX_ARCHITECTURES STREQUAL arm64)
 endif()
 
 # Options for libigl modules
-
 option(LIBIGL_USE_STATIC_LIBRARY "Use libigl as static library" OFF)
 option(LIBIGL_WITH_ANTTWEAKBAR "Use AntTweakBar" OFF)
 option(LIBIGL_WITH_CGAL "Use CGAL" OFF)
@@ -145,7 +151,8 @@ include(sanitizers)
 # ###############################################################################
 
 # add_library() can only be called without any source since CMake 3.11 ...
-add_library(polyfem src/polyfem/State.cpp)
+add_library(polyfem)
+add_library(polyfem::polyfem ALIAS polyfem)
 
 # Must be call in the same "CMakeLists.txt" where add_library(polyfem ...) is called
 polyfem_autogen(polyfem eigs.py auto_eigs)
@@ -155,9 +162,6 @@ polyfem_autogen(polyfem elasticity_rhs.py auto_elasticity_rhs)
 
 # Public include directory for polyfem
 target_include_directories(polyfem PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
-
-# Extra warnings
-# target_link_libraries(polyfem PRIVATE warnings::all)
 
 # Use C++17
 target_compile_features(polyfem PUBLIC ${CXX17_FEATURES})
@@ -172,9 +176,19 @@ target_compile_definitions(polyfem PUBLIC -DEIGEN_STACK_ALLOCATION_LIMIT=0)
 target_compile_definitions(polyfem PUBLIC -DPOLYFEM_SMALL_N=${POLYFEM_SMALL_N})
 target_compile_definitions(polyfem PUBLIC -DPOLYFEM_BIG_N=${POLYFEM_BIG_N})
 
-################################################################################
+target_compile_definitions(polyfem PUBLIC POLYFEM_INPUT_SPEC="${CMAKE_SOURCE_DIR}/input-spec.json")
+
+if(MSVC)
+    add_compile_options(/bigobj)
+endif()
+
+# ###############################################################################
 # Required libraries
 # ###############################################################################
+
+# Eigen
+include(eigen)
+target_link_libraries(polyfem PUBLIC Eigen3::Eigen)
 
 # polysolve
 include(polysolver)
@@ -232,6 +246,10 @@ target_link_libraries(polyfem PUBLIC tinyexpr::tinyexpr)
 include(tinyxml)
 target_link_libraries(polyfem PUBLIC tinyxml2)
 
+# jse library
+include(jse)
+target_link_libraries(polyfem PUBLIC jse::jse)
+
 if(POLYFEM_WITH_REMESHING)
     # wmtk library
     include(wmtk)
@@ -250,6 +268,17 @@ target_link_libraries(polyfem PUBLIC HighFive::HighFive)
 include(thrust)
 target_link_libraries(polyfem PUBLIC Thrust::Thrust)
 
+# ###############################################################################
+# natsort library
+include(natsort)
+target_link_libraries(polyfem PUBLIC natsort::natsort)
+
+# GLOB library
+include(glob)
+target_link_libraries(polyfem PUBLIC Glob::Glob)
+
+# Extra warnings (include this at the end to have highest priority)
+target_link_libraries(polyfem PRIVATE polyfem::warnings)
 
 # ###############################################################################
 # Optional libraries
@@ -289,8 +318,6 @@ if(POLYFEM_WITH_CLIPPER)
     target_compile_definitions(polyfem PUBLIC -DPOLYFEM_WITH_CLIPPER)
 endif()
 
-add_library(polyfem::polyfem ALIAS polyfem)
-
 # ###############################################################################
 # Polyfem binary
 # ###############################################################################
@@ -305,28 +332,29 @@ if(POLYFEM_TOPLEVEL_PROJECT)
     target_link_libraries(${PROJECT_NAME}_bin
         PUBLIC
         polyfem::polyfem
-        warnings::all
+        polyfem::warnings
         CLI11::CLI11
         -lcublas
         -lcurand
     )
 
-    if(NOT (${CMAKE_VERSION} VERSION_LESS "3.6.0"))
+    if(NOT(${CMAKE_VERSION} VERSION_LESS "3.6.0"))
         set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT ${PROJECT_NAME}_bin)
     endif()
 
     if(POLYFEM_BUILD_DOCS)
         # check if Doxygen is installed
         find_package(Doxygen)
-        if (DOXYGEN_FOUND)
+
+        if(DOXYGEN_FOUND)
             add_custom_target(polyfem_doc_doxygen ALL
                 COMMAND ${DOXYGEN_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/Doxyfile
                 WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
                 COMMENT "Generating API documentation with Doxygen"
                 VERBATIM)
-        else (DOXYGEN_FOUND)
+        else(DOXYGEN_FOUND)
             message("Doxygen need to be installed to generate the doxygen documentation")
-        endif (DOXYGEN_FOUND)
+        endif(DOXYGEN_FOUND)
     endif()
 endif()
 
@@ -357,9 +385,9 @@ endif()
 # target_include_directories(polyfem PUBLIC ${Thrust_INCLUDE_DIRS})
 # target_link_libraries(polyfem PUBLIC Thrust)
 
-#USING AS SHARED LIBRARY
+# USING AS SHARED LIBRARY
 
-#set(CUDA_USE_STATIC_CUDA_RUNTIME OFF CACHE INTERNAL "") 
+# set(CUDA_USE_STATIC_CUDA_RUNTIME OFF CACHE INTERNAL "")
 include(CheckLanguage)
 check_language(CUDA)
 
@@ -370,9 +398,10 @@ else()
 endif()
 
 set_target_properties(polyfem PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
-#SETTING OPT 0 compiler flag for DEBUG mode
-#string(REGEX REPLACE "(\-O[011123456789])" "" CMAKE_CUDA_FLAGS_DEBUG "${CMAKE_CUDA_FLAGS_DEBUG}")
-#set(CMAKE_CUDA_FLAGS_DEBUG "${CMAKE_CUDA_FLAGS_DEBUG} -O0 -G")
+
+# SETTING OPT 0 compiler flag for DEBUG mode
+# string(REGEX REPLACE "(\-O[011123456789])" "" CMAKE_CUDA_FLAGS_DEBUG "${CMAKE_CUDA_FLAGS_DEBUG}")
+# set(CMAKE_CUDA_FLAGS_DEBUG "${CMAKE_CUDA_FLAGS_DEBUG} -O0 -G")
 
 # foreach(flag IN LISTS ${CXX17_FEATURES})
 # add_compile_options("$<$<COMPILE_LANGUAGE:CUDA>:--compiler-options=${flag}>")
@@ -385,12 +414,10 @@ if(NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
     set(CMAKE_CUDA_ARCHITECTURES 60 70 75 86)
 endif()
 
-#set(CMAKE_CUDA_FLAGS "-shared -cudart shared -Xcompiler -fPIC"
-#CACHE STRING "Use libcudart.dylib" FORCE)
+# set(CMAKE_CUDA_FLAGS "-shared -cudart shared -Xcompiler -fPIC"
+# CACHE STRING "Use libcudart.dylib" FORCE)
 
-#target_link_libraries(polyfem PRIVATE cudart) #MUST!!
-
-
+# target_link_libraries(polyfem PRIVATE cudart) #MUST!!
 set_target_properties(polyfem PROPERTIES CUDA_ARCHITECTURES "60;70;75;86")
 set_target_properties(PolyFEM_bin PROPERTIES CUDA_ARCHITECTURES "60;70;75;86")
 

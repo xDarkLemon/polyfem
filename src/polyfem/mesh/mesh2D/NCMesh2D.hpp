@@ -251,9 +251,10 @@ namespace polyfem
 			void compute_boundary_ids(const std::function<int(const size_t, const RowVectorNd &, bool)> &marker) override;
 			void compute_boundary_ids(const std::function<int(const std::vector<int> &, bool)> &marker) override;
 			void compute_body_ids(const std::function<int(const size_t, const RowVectorNd &)> &marker) override;
+			void compute_boundary_ids(const std::function<int(const size_t, const std::vector<int> &, const RowVectorNd &, bool)> &marker) override;
+
 			void set_boundary_ids(const std::vector<int> &boundary_ids) override;
 			void set_body_ids(const std::vector<int> &body_ids) override;
-			void set_body_ids(const Eigen::VectorXi &body_ids) override;
 
 			int get_boundary_id(const int primitive) const override { return edges[valid_to_all_edge(primitive)].boundary_id; };
 			int get_body_id(const int primitive) const override { return elements[valid_to_all_elem(primitive)].body_id; };
@@ -293,6 +294,8 @@ namespace polyfem
 			}
 
 			void build_index_mapping();
+
+			void append(const Mesh &mesh) override;
 
 		private:
 			struct ArrayHasher2D

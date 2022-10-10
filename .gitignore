@@ -31,6 +31,7 @@
 
 # Python cache
 __pycache__
+*-checkpoint.ipynb
 
 # Executables
 *.exe
@@ -52,10 +53,7 @@ __pycache__
 *.code-workspace
 .vscode/
 .idea/
-build/
-test_build/
-debug_build/
-cmake-build-*/
+*build/
 bin*
 bin_rel*
 bin.nosync
@@ -63,7 +61,6 @@ build*
 xcode*
 3rdparty*
 /data
-/test_build
 
 .DS_STORE
 
@@ -90,3 +87,5 @@ docs/html
 *.vtm
 *.pvd
 *.json
+scripts/*.txt
+scripts/*.json

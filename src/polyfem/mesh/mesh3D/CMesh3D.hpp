@@ -64,13 +64,14 @@ namespace polyfem
 
 			RowVectorNd kernel(const int cell_id) const override;
 			RowVectorNd point(const int vertex_id) const override;
+			void set_point(const int global_index, const RowVectorNd &p) override;
 			RowVectorNd edge_barycenter(const int e) const override;
 			RowVectorNd face_barycenter(const int f) const override;
 			RowVectorNd cell_barycenter(const int c) const override;
 
 			void bounding_box(RowVectorNd &min, RowVectorNd &max) const override;
 
-			//navigation wrapper
+			// navigation wrapper
 			Navigation3D::Index get_index_from_element(int hi, int lf, int lv) const override { return Navigation3D::get_index_from_element_face(mesh_, hi, lf, lv); }
 			Navigation3D::Index get_index_from_element(int hi) const override { return Navigation3D::get_index_from_element_face(mesh_, hi); }
 
@@ -107,16 +108,19 @@ namespace polyfem
 			void compute_boundary_ids(const std::function<int(const size_t, const RowVectorNd &, bool)> &marker) override;
 			void compute_boundary_ids(const std::function<int(const std::vector<int> &, bool)> &marker) override;
 			void compute_body_ids(const std::function<int(const size_t, const RowVectorNd &)> &marker) override;
+			void compute_boundary_ids(const std::function<int(const size_t, const std::vector<int> &, const RowVectorNd &, bool)> &marker) override;
 
 			void triangulate_faces(Eigen::MatrixXi &tris, Eigen::MatrixXd &pts, std::vector<int> &ranges) const override;
 
-			//used for sweeping 2D mesh
+			// used for sweeping 2D mesh
 			Mesh3DStorage &mesh_storge()
 			{
 				std::cerr << "never user this function" << std::endl;
 				return mesh_;
 			}
 			static void geomesh_2_mesh_storage(const GEO::Mesh &gm, Mesh3DStorage &m);
+
+			void append(const Mesh &mesh) override;
 
 		protected:
 			bool load(const std::string &path) override;

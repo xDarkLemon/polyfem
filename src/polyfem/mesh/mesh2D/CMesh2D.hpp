@@ -78,6 +78,7 @@ namespace polyfem
 			void compute_boundary_ids(const std::function<int(const RowVectorNd &, bool)> &marker) override;
 			void compute_boundary_ids(const std::function<int(const size_t, const RowVectorNd &, bool)> &marker) override;
 			void compute_boundary_ids(const std::function<int(const std::vector<int> &, bool)> &marker) override;
+			void compute_boundary_ids(const std::function<int(const size_t, const std::vector<int> &, const RowVectorNd &, bool)> &marker) override;
 
 			void compute_body_ids(const std::function<int(const size_t, const RowVectorNd &)> &marker) override;
 
@@ -90,6 +91,8 @@ namespace polyfem
 			inline Navigation::Index switch_face(Navigation::Index idx) const override { return Navigation::switch_face(mesh_, *c2e_, idx); }
 
 			void triangulate_faces(Eigen::MatrixXi &tris, Eigen::MatrixXd &pts, std::vector<int> &ranges) const override;
+
+			void append(const Mesh &mesh) override;
 
 		protected:
 			bool load(const std::string &path) override;

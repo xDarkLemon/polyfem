@@ -6,7 +6,7 @@ namespace polyfem::time_integrator
 {
 	/// Implicit Euler time integrator of a second order ODE (equivently a system of coupled first order ODEs).
 	/// \f[
-	/// 	x^{t+1} = x^t + \Delta t v^{t+1}\\
+	/// 	x^{t+1} = x^t + \Delta t v^{t+1}\newline
 	/// 	v^{t+1} = v^t + \Delta t a^{t+1}
 	/// \f]
 	/// @see https://en.wikipedia.org/wiki/Backward_Euler_method
@@ -17,7 +17,7 @@ namespace polyfem::time_integrator
 
 		/// @brief Update the time integration quantaties (i.e., \f$x\f$, \f$v\f$, and \f$a\f$).
 		/// \f[
-		/// 	v^{t+1} = \frac{1}{\Delta t} (x - x^t)\\
+		/// 	v^{t+1} = \frac{1}{\Delta t} (x - x^t)\newline
 		/// 	a^{t+1} = \frac{1}{\Delta t} (v - v^t)
 		/// \f]
 		/// @param x new solution vector
@@ -29,6 +29,22 @@ namespace polyfem::time_integrator
 		/// \f]
 		/// @return value for \f$\tilde{x}\f$
 		Eigen::VectorXd x_tilde() const override;
+
+		/// @brief Compute the current velocity given the current solution and using the stored previous solution(s).
+		/// \f[
+		/// 	v = \frac{x - x^t}{\Delta t}
+		/// \f]
+		/// @param x current solution vector
+		/// @return value for \f$v\f$
+		Eigen::VectorXd compute_velocity(const Eigen::VectorXd &x) const override;
+
+		/// @brief Compute the current acceleration given the current velocity and using the stored previous velocity(s).
+		/// \f[
+		/// 	a = \frac{v - v^t}{\Delta t}
+		/// \f]
+		/// @param v current velocity
+		/// @return value for \f$a\f$
+		Eigen::VectorXd compute_acceleration(const Eigen::VectorXd &v) const override;
 
 		/// @brief Compute the acceleration scaling used to scale forces when integrating a second order ODE.
 		/// \f[

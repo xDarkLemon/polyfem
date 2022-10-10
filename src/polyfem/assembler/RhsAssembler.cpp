@@ -36,9 +36,9 @@ namespace polyfem
 			};
 		} // namespace
 
-		RhsAssembler::RhsAssembler(const AssemblerUtils &assembler, const Mesh &mesh, const Obstacle &obstacle, const std::vector<Eigen::MatrixXd> &input_dirichelt,
+		RhsAssembler::RhsAssembler(const AssemblerUtils &assembler, const Mesh &mesh, const Obstacle &obstacle, const std::vector<Eigen::MatrixXd> &input_dirichlet,
 								   const int n_basis, const int size,
-								   const std::vector<ElementBases> &bases, const std::vector<ElementBases> &gbases, const AssemblyValsCache &ass_vals_cache,
+								   const std::vector<basis::ElementBases> &bases, const std::vector<basis::ElementBases> &gbases, const AssemblyValsCache &ass_vals_cache,
 								   const std::string &formulation, const Problem &problem,
 								   const std::string bc_method,
 								   const std::string &solver, const std::string &preconditioner, const json &solver_params)
@@ -48,7 +48,7 @@ namespace polyfem
 			  formulation_(formulation), problem_(problem),
 			  bc_method_(bc_method),
 			  solver_(solver), preconditioner_(preconditioner), solver_params_(solver_params),
-			  input_dirichelt_(input_dirichelt)
+			  input_dirichlet_(input_dirichlet)
 		{
 		}
 
@@ -72,7 +72,7 @@ namespace polyfem
 
 					for (int d = 0; d < size_; ++d)
 					{
-						//rhs_fun.col(d) = rhs_fun.col(d).array() * vals.det.array() * quadrature.weights.array();
+						// rhs_fun.col(d) = rhs_fun.col(d).array() * vals.det.array() * quadrature.weights.array();
 						for (int q = 0; q < quadrature.weights.size(); ++q)
 						{
 							// const double rho = problem_.is_time_dependent() ? density(vals.quadrature.points.row(q), vals.val.row(q), vals.element_id) : 1;
@@ -134,7 +134,7 @@ namespace polyfem
 			{
 				for (int e = 0; e < n_elements; ++e)
 				{
-					const ElementBases &bs = bases_[e];
+					const basis::ElementBases &bs = bases_[e];
 					// vals.compute(e, mesh_.is_volume(), bases_[e], gbases_[e]);
 					ass_vals_cache_.compute(e, mesh_.is_volume(), bases_[e], gbases_[e], vals);
 					ids.resize(1, 1);
@@ -144,7 +144,7 @@ namespace polyfem
 					{
 						const auto &b = bs.bases[i];
 						const auto &glob = b.global();
-						assert(glob.size() == 1);
+						// assert(glob.size() == 1);
 						for (size_t ii = 0; ii < glob.size(); ++ii)
 						{
 							fun(mesh_, ids, glob[ii].node, loc_sol);
@@ -168,7 +168,7 @@ namespace polyfem
 					ids.setConstant(e);
 
 					const Quadrature &quadrature = vals.quadrature;
-					//problem_.initial_solution(vals.val, loc_sol);
+					// problem_.initial_solution(vals.val, loc_sol);
 					fun(mesh_, ids, vals.val, loc_sol);
 
 					for (int d = 0; d < size_; ++d)
@@ -197,8 +197,7 @@ namespace polyfem
 				if (fabs(mmin) > 1e-8 || fabs(mmax) > 1e-8)
 				{
 					StiffnessMatrix mass;
-					Density d;
-					assembler_.assemble_mass_matrix(formulation_, size_ == 3, n_basis_, d, bases_, gbases_, ass_vals_cache_, mass);
+					assembler_.assemble_mass_matrix(formulation_, size_ == 3, n_basis_, false, bases_, gbases_, ass_vals_cache_, mass);
 					auto solver = LinearSolver::create(solver_, preconditioner_);
 					solver->setParameters(solver_params_);
 					solver->analyzePattern(mass, mass.rows());
@@ -257,18 +256,18 @@ namespace polyfem
 				if (!has_samples)
 					continue;
 
-				const ElementBases &bs = bases_[e];
+				const basis::ElementBases &bs = bases_[e];
 				const int n_local_bases = int(bs.bases.size());
 
 				total_size += samples.rows();
 
 				for (int j = 0; j < n_local_bases; ++j)
 				{
-					const Basis &b = bs.bases[j];
+					const basis::Basis &b = bs.bases[j];
 
 					for (std::size_t ii = 0; ii < b.global().size(); ++ii)
 					{
-						//pt found
+						// pt found
 						// if(std::find(bounday_nodes.begin(), bounday_nodes.end(), size_ * b.global()[ii].index) != bounday_nodes.end())
 						if (is_boundary[b.global()[ii].index])
 						{
@@ -308,8 +307,8 @@ namespace polyfem
 				if (!has_samples)
 					continue;
 
-				const ElementBases &bs = bases_[e];
-				const ElementBases &gbs = gbases_[e];
+				const basis::ElementBases &bs = bases_[e];
+				const basis::ElementBases &gbs = gbases_[e];
 				const int n_local_bases = int(bs.bases.size());
 
 				gbs.eval_geom_mapping(samples, mapped);
@@ -317,7 +316,7 @@ namespace polyfem
 				bs.evaluate_bases(samples, tmp_val);
 				for (int j = 0; j < n_local_bases; ++j)
 				{
-					const Basis &b = bs.bases[j];
+					const basis::Basis &b = bs.bases[j];
 					const auto &tmp = tmp_val[j].val;
 
 					for (std::size_t ii = 0; ii < b.global().size(); ++ii)
@@ -344,13 +343,13 @@ namespace polyfem
 				global_rhs.block(global_counter, 0, rhs_fun.rows(), rhs_fun.cols()) = rhs_fun;
 				global_counter += rhs_fun.rows();
 
-				//UIState::ui_state().debug_data().add_points(mapped, Eigen::MatrixXd::Constant(1, 3, 0));
+				// UIState::ui_state().debug_data().add_points(mapped, Eigen::MatrixXd::Constant(1, 3, 0));
 
-				//Eigen::MatrixXd asd(mapped.rows(), 3);
-				//asd.col(0)=mapped.col(0);
-				//asd.col(1)=mapped.col(1);
-				//asd.col(2)=rhs_fun;
-				//UIState::ui_state().debug_data().add_points(asd, Eigen::MatrixXd::Constant(1, 3, 0));
+				// Eigen::MatrixXd asd(mapped.rows(), 3);
+				// asd.col(0)=mapped.col(0);
+				// asd.col(1)=mapped.col(1);
+				// asd.col(2)=rhs_fun;
+				// UIState::ui_state().debug_data().add_points(asd, Eigen::MatrixXd::Constant(1, 3, 0));
 			}
 
 			assert(global_counter == total_size);
@@ -439,7 +438,7 @@ namespace polyfem
 			for (const auto &lb : local_boundary)
 			{
 				const int e = lb.element_id();
-				const ElementBases &bs = bases_[e];
+				const basis::ElementBases &bs = bases_[e];
 
 				for (int i = 0; i < lb.size(); ++i)
 				{
@@ -455,7 +454,7 @@ namespace polyfem
 						{
 							assert(is_boundary[glob[ii].index]);
 
-							//TODO, missing UV!!!!
+							// TODO, missing UV!!!!
 							df(global_primitive_ids, nans, glob[ii].node, rhs_fun);
 
 							for (int d = 0; d < size_; ++d)
@@ -508,8 +507,8 @@ namespace polyfem
 				if (!has_samples)
 					continue;
 
-				const ElementBases &bs = bases_[e];
-				const ElementBases &gbs = gbases_[e];
+				const basis::ElementBases &bs = bases_[e];
+				const basis::ElementBases &gbs = gbases_[e];
 
 				vals.compute(e, mesh_.is_volume(), samples, bs, gbs);
 
@@ -556,7 +555,10 @@ namespace polyfem
 		void RhsAssembler::set_bc(
 			const std::function<void(const Eigen::MatrixXi &, const Eigen::MatrixXd &, const Eigen::MatrixXd &, Eigen::MatrixXd &)> &df,
 			const std::function<void(const Eigen::MatrixXi &, const Eigen::MatrixXd &, const Eigen::MatrixXd &, const Eigen::MatrixXd &, Eigen::MatrixXd &)> &nf,
-			const std::vector<LocalBoundary> &local_boundary, const std::vector<int> &bounday_nodes, const int resolution, const std::vector<LocalBoundary> &local_neumann_boundary, Eigen::MatrixXd &rhs) const
+			const std::vector<LocalBoundary> &local_boundary, const std::vector<int> &bounday_nodes,
+			const int resolution, const std::vector<LocalBoundary> &local_neumann_boundary,
+			const Eigen::MatrixXd &displacement,
+			Eigen::MatrixXd &rhs) const
 		{
 			if (bc_method_ == "sample")
 				sample_bc(df, local_boundary, bounday_nodes, rhs);
@@ -567,7 +569,7 @@ namespace polyfem
 
 			if (bounday_nodes.size() > 0)
 			{
-				for (const auto &m : input_dirichelt_)
+				for (const auto &m : input_dirichlet_)
 				{
 					assert(m.cols() == size_ + 1);
 					for (int n = 0; n < m.rows(); ++n)
@@ -575,6 +577,8 @@ namespace polyfem
 						const int n_id = m(n, 0);
 						for (int d = 0; d < size_; ++d)
 						{
+							if (std::isnan(m(n, d + 1)))
+								continue;
 							const int g_index = n_id * size_ + d;
 							rhs(g_index) = m(n, d + 1);
 						}
@@ -582,8 +586,8 @@ namespace polyfem
 				}
 			}
 
-			//Neumann
-			Eigen::MatrixXd uv, samples, gtmp, rhs_fun;
+			// Neumann
+			Eigen::MatrixXd uv, samples, gtmp, rhs_fun, deform_mat, trafo;
 			Eigen::VectorXi global_primitive_ids;
 			Eigen::MatrixXd points, normals;
 			Eigen::VectorXd weights;
@@ -598,16 +602,43 @@ namespace polyfem
 				if (!has_samples)
 					continue;
 
-				const ElementBases &gbs = gbases_[e];
-				const ElementBases &bs = bases_[e];
+				const basis::ElementBases &gbs = gbases_[e];
+				const basis::ElementBases &bs = bases_[e];
 
 				vals.compute(e, mesh_.is_volume(), points, bs, gbs);
 
 				for (int n = 0; n < vals.jac_it.size(); ++n)
 				{
-					normals.row(n) = normals.row(n) * vals.jac_it[n];
+					Eigen::MatrixXd ppp(1, size_);
+					ppp = vals.val.row(n);
+
+					trafo = vals.jac_it[n];
+
+					if (displacement.size() > 0)
+					{
+						assert(size_ == 2 || size_ == 3);
+						deform_mat.resize(size_, size_);
+						deform_mat.setZero();
+						for (const auto &b : vals.basis_values)
+						{
+							for (const auto &g : b.global)
+							{
+								for (int d = 0; d < size_; ++d)
+								{
+									deform_mat.col(d) += displacement(g.index * size_ + d) * b.grad_t_m.row(n);
+
+									ppp(d) += displacement(g.index * size_ + d) * b.val(n);
+								}
+							}
+						}
+
+						trafo += deform_mat;
+					}
+
+					normals.row(n) = normals.row(n) * trafo;
 					normals.row(n).normalize();
 				}
+
 				// problem_.neumann_bc(mesh_, global_primitive_ids, vals.val, t, rhs_fun);
 				nf(global_primitive_ids, uv, vals.val, normals, rhs_fun);
 
@@ -645,7 +676,7 @@ namespace polyfem
 			}
 		}
 
-		void RhsAssembler::set_bc(const std::vector<LocalBoundary> &local_boundary, const std::vector<int> &bounday_nodes, const int resolution, const std::vector<LocalBoundary> &local_neumann_boundary, Eigen::MatrixXd &rhs, const double t) const
+		void RhsAssembler::set_bc(const std::vector<LocalBoundary> &local_boundary, const std::vector<int> &bounday_nodes, const int resolution, const std::vector<LocalBoundary> &local_neumann_boundary, Eigen::MatrixXd &rhs, const Eigen::MatrixXd &displacement, const double t) const
 		{
 			set_bc(
 				[&](const Eigen::MatrixXi &global_ids, const Eigen::MatrixXd &uv, const Eigen::MatrixXd &pts, Eigen::MatrixXd &val) {
@@ -654,7 +685,7 @@ namespace polyfem
 				[&](const Eigen::MatrixXi &global_ids, const Eigen::MatrixXd &uv, const Eigen::MatrixXd &pts, const Eigen::MatrixXd &normals, Eigen::MatrixXd &val) {
 					problem_.neumann_bc(mesh_, global_ids, uv, pts, normals, t, val);
 				},
-				local_boundary, bounday_nodes, resolution, local_neumann_boundary, rhs);
+				local_boundary, bounday_nodes, resolution, local_neumann_boundary, displacement, rhs);
 
 			obstacle_.update_displacement(t, rhs);
 		}
@@ -675,7 +706,7 @@ namespace polyfem
 				{
 					const int prev_size = rhs.size();
 					rhs.conservativeResize(final_rhs.size(), rhs.cols());
-					//Zero initial pressure
+					// Zero initial pressure
 					rhs.block(prev_size, 0, final_rhs.size() - prev_size, rhs.cols()).setZero();
 					rhs(rhs.size() - 1) = 0;
 				}
@@ -751,8 +782,8 @@ namespace polyfem
 			Eigen::MatrixXd forces;
 
 			ElementAssemblyValues vals;
-			//Neumann
-			Eigen::MatrixXd points, uv, normals;
+			// Neumann
+			Eigen::MatrixXd points, uv, normals, deform_mat;
 			Eigen::VectorXd weights;
 			Eigen::VectorXi global_primitive_ids;
 			for (const auto &lb : local_neumann_boundary)
@@ -763,8 +794,8 @@ namespace polyfem
 				if (!has_samples)
 					continue;
 
-				const ElementBases &gbs = gbases_[e];
-				const ElementBases &bs = bases_[e];
+				const basis::ElementBases &gbs = gbases_[e];
+				const basis::ElementBases &bs = bases_[e];
 
 				vals.compute(e, mesh_.is_volume(), points, bs, gbs);
 

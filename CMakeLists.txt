@@ -26,7 +26,14 @@ if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/PolyFEMOptions.cmake)
     include(${CMAKE_CURRENT_SOURCE_DIR}/PolyFEMOptions.cmake)
 endif()
 
-# ###############################################################################
+################################################################################
+# CMake Policies
+################################################################################
+
+# cmake_policy(VERSION 3.24)
+# cmake_policy(SET CMP0135 NEW) # https://cmake.org/cmake/help/latest/policy/CMP0135.html
+
+################################################################################
 project(PolyFEM DESCRIPTION "A polyvalent C++ FEM library")
 
 # ###############################################################################
@@ -144,7 +151,8 @@ include(sanitizers)
 # ###############################################################################
 
 # add_library() can only be called without any source since CMake 3.11 ...
-add_library(polyfem src/polyfem/State.cpp)
+add_library(polyfem)
+add_library(polyfem::polyfem ALIAS polyfem)
 
 # Must be call in the same "CMakeLists.txt" where add_library(polyfem ...) is called
 polyfem_autogen(polyfem eigs.py auto_eigs)
@@ -154,9 +162,6 @@ polyfem_autogen(polyfem elasticity_rhs.py auto_elasticity_rhs)
 
 # Public include directory for polyfem
 target_include_directories(polyfem PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
-
-# Extra warnings
-# target_link_libraries(polyfem PRIVATE warnings::all)
 
 # Use C++17
 target_compile_features(polyfem PUBLIC ${CXX17_FEATURES})
@@ -171,9 +176,19 @@ target_compile_definitions(polyfem PUBLIC -DEIGEN_STACK_ALLOCATION_LIMIT=0)
 target_compile_definitions(polyfem PUBLIC -DPOLYFEM_SMALL_N=${POLYFEM_SMALL_N})
 target_compile_definitions(polyfem PUBLIC -DPOLYFEM_BIG_N=${POLYFEM_BIG_N})
 
-# ###############################################################################
+target_compile_definitions(polyfem PUBLIC POLYFEM_INPUT_SPEC="${CMAKE_SOURCE_DIR}/input-spec.json")
+
+if (MSVC)
+    add_compile_options(/bigobj)
+endif ()
+
+################################################################################
 # Required libraries
 # ###############################################################################
+
+# Eigen
+include(eigen)
+target_link_libraries(polyfem PUBLIC Eigen3::Eigen)
 
 # polysolve
 include(polysolver)
@@ -231,6 +246,12 @@ target_link_libraries(polyfem PUBLIC tinyexpr::tinyexpr)
 include(tinyxml)
 target_link_libraries(polyfem PUBLIC tinyxml2)
 
+
+# jse library
+include(jse)
+target_link_libraries(polyfem PUBLIC jse::jse)
+
+
 if(POLYFEM_WITH_REMESHING)
     # wmtk library
     include(wmtk)
@@ -245,11 +266,18 @@ target_link_libraries(polyfem PUBLIC hdf5::hdf5)
 include(high_five)
 target_link_libraries(polyfem PUBLIC HighFive::HighFive)
 
-# Thrust
-include(thrust)
-target_link_libraries(polyfem PUBLIC Thrust::Thrust)
+# natsort library
+include(natsort)
+target_link_libraries(polyfem PUBLIC natsort::natsort)
 
-# ###############################################################################
+# GLOB library
+include(glob)
+target_link_libraries(polyfem PUBLIC Glob::Glob)
+
+# Extra warnings (include this at the end to have highest priority)
+target_link_libraries(polyfem PRIVATE polyfem::warnings)
+
+################################################################################
 # Optional libraries
 # ###############################################################################
 
@@ -287,9 +315,7 @@ if(POLYFEM_WITH_CLIPPER)
     target_compile_definitions(polyfem PUBLIC -DPOLYFEM_WITH_CLIPPER)
 endif()
 
-add_library(polyfem::polyfem ALIAS polyfem)
-
-# ###############################################################################
+################################################################################
 # Polyfem binary
 # ###############################################################################
 
@@ -302,11 +328,9 @@ if(POLYFEM_TOPLEVEL_PROJECT)
     include(cli11)
     target_link_libraries(${PROJECT_NAME}_bin
         PUBLIC
-        polyfem::polyfem
-        warnings::all
-        CLI11::CLI11
-        -lcublas
-        -lcurand
+            polyfem::polyfem
+            polyfem::warnings
+            CLI11::CLI11
     )
 
     if(NOT(${CMAKE_VERSION} VERSION_LESS "3.6.0"))

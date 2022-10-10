@@ -11,33 +11,40 @@ namespace polyfem
 {
 	namespace utils
 	{
-		void apply_default_params(json &args)
+		void apply_common_params(json &args)
 		{
-			assert(args.contains("common"));
-
-			std::string default_params_path = resolve_path(args["common"], args["root_path"]);
-
-			if (default_params_path.empty())
+			if (!args.contains("common"))
 				return;
 
-			std::ifstream file(default_params_path);
+			std::string common_params_path = resolve_path(args["common"], args["root_path"]);
+
+			if (common_params_path.empty())
+				return;
+
+			std::ifstream file(common_params_path);
 			if (!file.is_open())
-			{
-				logger().error("unable to open default params {} file", default_params_path);
-				return;
-			}
+				log_and_throw_error(fmt::format("Unable to open common params {} file", common_params_path));
 
-			json default_params;
-			file >> default_params;
+			json common_params;
+			file >> common_params;
 			file.close();
 
-			default_params.merge_patch(args);
-			args = default_params;
+			// Recursively apply common params
+			common_params["root_path"] = common_params_path;
+			apply_common_params(common_params);
+
+			common_params.merge_patch(args);
+			args = common_params;
 		}
 
 		Eigen::Matrix3d to_rotation_matrix(const json &jr, std::string mode)
 		{
 			std::transform(mode.begin(), mode.end(), mode.begin(), ::tolower);
+
+			if (jr.is_array() && jr.empty())
+			{
+				return Eigen::Matrix3d::Identity(3, 3);
+			}
 
 			Eigen::VectorXd r;
 			if (jr.is_number())
@@ -98,32 +105,6 @@ namespace polyfem
 			}
 
 			return R;
-		}
-
-		// check that incomming json doesn't have any unkown keys to avoid stupid bugs
-		bool check_for_unknown_args(const json &args, const json &args_in, const std::string &path_prefix)
-		{
-			bool found_unknown_arg = false;
-			json patch = json::diff(args, args_in);
-			for (const json &op : patch)
-			{
-				if (op["op"].get<std::string>() == "add")
-				{
-					json::json_pointer new_path(op["path"].get<std::string>());
-					if (!args_in[new_path.parent_pointer()].is_array()
-						&& new_path.back().size() != 0
-						&& new_path.back().front() != '#'
-						&& new_path.back() != "authen_t1")
-					{
-						json::json_pointer parent = new_path.parent_pointer();
-						logger().warn(
-							"Unknown key in json (path={}{})",
-							path_prefix, op["path"].get<std::string>());
-						found_unknown_arg = true;
-					}
-				}
-			}
-			return found_unknown_arg;
 		}
 
 		bool is_param_valid(const json &params, const std::string &key)

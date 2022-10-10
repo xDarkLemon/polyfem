@@ -2,13 +2,15 @@
 
 #include <polyfem/Common.hpp>
 
+#include <Eigen/Core>
 #include <igl/PI.h>
+#include <filesystem>
 
 namespace polyfem
 {
 	namespace utils
 	{
-		void apply_default_params(json &args);
+		void apply_common_params(json &args);
 
 		// Templated degree to radians so a scalar or vector can be given
 		template <typename T>
@@ -20,8 +22,6 @@ namespace polyfem
 		// Converts a JSON rotation expressed in the given rotation mode to a 3D rotation matrix.
 		// NOTE: mode is a copy because the mode will be transformed to be case insensitive
 		Eigen::Matrix3d to_rotation_matrix(const json &jr, std::string mode = "xyz");
-
-		bool check_for_unknown_args(const json &args, const json &args_in, const std::string &path_prefix = "");
 
 		bool is_param_valid(const json &params, const std::string &key);
 	} // namespace utils
@@ -61,6 +61,20 @@ namespace nlohmann
 		{
 			auto jv = j.get<std::vector<T>>();
 			v = Eigen::Map<Vector<T, dim, max_dim>>(jv.data(), long(jv.size()));
+		}
+	};
+
+	template <>
+	struct adl_serializer<std::filesystem::path>
+	{
+		static void to_json(json &j, const std::filesystem::path &p)
+		{
+			j = p.string();
+		}
+
+		static void from_json(const json &j, std::filesystem::path &p)
+		{
+			p = j.get<std::string>();
 		}
 	};
 } // namespace nlohmann

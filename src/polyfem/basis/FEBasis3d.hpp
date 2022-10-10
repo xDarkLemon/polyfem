@@ -25,10 +25,11 @@ namespace polyfem
 			///
 			/// @param[in]  mesh               The input volumetric mesh
 			/// @param[in]  quadrature_order   The quadrature order
+			/// @param[in]  mass_quadrature_order   The quadrature order for mass
 			/// @param[in]  discr_order        The order of the elements (1-4)
 			/// @param[in]  serendipity        Uses serendipity bases or not (only for hex)
 			/// @param[in]  has_polys          Does the mesh has polygons, if not the interface mapping is not necessary
-			/// @param[in]  is_geom_bases      Flag to decide if build gemetric mapping or normal bases, used to decide if the ndoes are important
+			/// @param[in]  is_geom_bases      Flag to decide if build geometric mapping or normal bases, used to decide if the nodes are important
 			/// @param[out] bases              List of basis functions per element
 			/// @param[out] local_boundary     List of descriptor per element, indicating which edge of
 			///                                the canonical elements lie on the boundary of the mesh
@@ -40,6 +41,7 @@ namespace polyfem
 			static int build_bases(
 				const mesh::Mesh3D &mesh,
 				const int quadrature_order,
+				const int mass_quadrature_order,
 				const int discr_order,
 				const bool serendipity,
 				const bool has_polys,
@@ -47,7 +49,7 @@ namespace polyfem
 				std::vector<ElementBases> &bases,
 				std::vector<mesh::LocalBoundary> &local_boundary,
 				std::map<int, InterfaceData> &poly_face_to_data,
-				std::shared_ptr<polyfem::mesh::MeshNodes> &mesh_nodes);
+				std::shared_ptr<mesh::MeshNodes> &mesh_nodes);
 
 			///
 			/// @brief      Builds FE basis functions over the entire mesh (P1, P2 over tets, Q1,
@@ -56,10 +58,11 @@ namespace polyfem
 			///
 			/// @param[in]  mesh               The input volumetric mesh
 			/// @param[in]  quadrature_order   The quadrature order
+			/// @param[in]  mass_quadrature_order   The quadrature order for mass
 			/// @param[in]  discr_order        The order for each element
 			/// @param[in]  serendipity        Uses serendipity bases or not (only for hex)
 			/// @param[in]  has_polys          Does the mesh has polygons, if not the interface mapping is not necessary
-			/// @param[in]  is_geom_bases      Flag to decide if build gemetric mapping or normal bases, used to decide if the ndoes are important
+			/// @param[in]  is_geom_bases      Flag to decide if build geometric mapping or normal bases, used to decide if the nodes are important
 			/// @param[out] bases              List of basis functions per element
 			/// @param[out] local_boundary     List of descriptor per element, indicating which edge of
 			///                                the canonical elements lie on the boundary of the mesh
@@ -71,6 +74,7 @@ namespace polyfem
 			static int build_bases(
 				const mesh::Mesh3D &mesh,
 				const int quadrature_order,
+				const int mass_quadrature_order,
 				const Eigen::VectorXi &discr_order,
 				const bool serendipity,
 				const bool has_polys,
@@ -78,9 +82,9 @@ namespace polyfem
 				std::vector<ElementBases> &bases,
 				std::vector<mesh::LocalBoundary> &local_boundary,
 				std::map<int, InterfaceData> &poly_face_to_data,
-				std::shared_ptr<polyfem::mesh::MeshNodes> &mesh_nodes);
+				std::shared_ptr<mesh::MeshNodes> &mesh_nodes);
 
-			//return the local faces nodes for a tet or a hex of order p, index points to a face
+			// return the local faces nodes for a tet or a hex of order p, index points to a face
 			static Eigen::VectorXi tet_face_local_nodes(const int p, const mesh::Mesh3D &mesh, mesh::Navigation3D::Index index);
 			static Eigen::VectorXi hex_face_local_nodes(const bool serendipity, const int q, const mesh::Mesh3D &mesh, mesh::Navigation3D::Index index);
 

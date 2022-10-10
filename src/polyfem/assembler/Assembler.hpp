@@ -107,6 +107,40 @@ namespace polyfem::assembler
 			const Eigen::MatrixXd &displacement,
 			const Eigen::MatrixXd &displacement_prev) const;
 
+		// assemble gradient of energy (rhs GPU version)
+		void assemble_grad_GPU(
+			const bool is_volume,
+			const int n_basis,
+			const std::vector<basis::ElementBases> &bases,
+			const std::vector<basis::ElementBases> &gbases,
+			const AssemblyValsCache &cache,
+			const Eigen::MatrixXd &displacement,
+			Eigen::MatrixXd &rhs) const;
+
+		// assemble hessian of energy (grad GPU version)
+		void assemble_hessian_GPU(
+			const bool is_volume,
+			const int n_basis,
+			const bool project_to_psd,
+			const std::vector<basis::ElementBases> &bases,
+			const std::vector<basis::ElementBases> &gbases,
+			const AssemblyValsCache &cache,
+			const Eigen::MatrixXd &displacement,
+			utils::SpareMatrixCache &mat_cache,
+			StiffnessMatrix &grad,
+			int *outer_index_ptr,
+			int size_outerindex,
+			int *inner_index_ptr,
+			int size_innerindex) const;
+
+		// assemble energy (GPU version)
+		double assemble_GPU(
+			const bool is_volume,
+			const std::vector<basis::ElementBases> &bases,
+			const std::vector<basis::ElementBases> &gbases,
+			const AssemblyValsCache &cache,
+			const Eigen::MatrixXd &displacement) const;
+
 		inline LocalAssembler &local_assembler() { return local_assembler_; }
 		inline const LocalAssembler &local_assembler() const { return local_assembler_; }
 

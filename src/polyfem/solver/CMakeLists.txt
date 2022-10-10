@@ -9,10 +9,12 @@ set(SOURCES
 	NavierStokesSolver.hpp
 	NLProblem.cpp
 	NLProblem.hpp
+	#	NonlinearSolver.cu
 	NonlinearSolver.hpp
 	NonlinearSolver.tpp
 	OperatorSplittingSolver.hpp
 	OperatorSplittingSolver.cpp
+	#SparseNewtonDescentSolver.cu
 	SparseNewtonDescentSolver.hpp
 	SparseNewtonDescentSolver.tpp
 	TransientNavierStokesSolver.cpp

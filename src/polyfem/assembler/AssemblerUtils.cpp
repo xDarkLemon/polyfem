@@ -222,9 +222,21 @@ namespace polyfem
 											   const Eigen::MatrixXd &displacement_prev) const
 		{
 			if (assembler == "SaintVenant")
+
 				return saint_venant_elasticity_.assemble(is_volume, bases, gbases, cache, dt, displacement, displacement_prev);
+#ifdef USE_GPU
 			else if (assembler == "NeoHookean")
+			{
 				return neo_hookean_elasticity_.assemble(is_volume, bases, gbases, cache, dt, displacement, displacement_prev);
+				//	return neo_hookean_elasticity_.assemble_GPU(is_volume, bases, gbases, cache, displacement);
+			}
+#endif
+#ifndef USE_GPU
+			else if (assembler == "NeoHookean")
+			{
+				return neo_hookean_elasticity_.assemble(is_volume, bases, gbases, cache, dt, displacement, displacement_prev);
+			}
+#endif
 			else if (assembler == "MultiModels")
 				return multi_models_elasticity_.assemble(is_volume, bases, gbases, cache, dt, displacement, displacement_prev);
 			else if (assembler == "Damping")
@@ -251,8 +263,17 @@ namespace polyfem
 		{
 			if (assembler == "SaintVenant")
 				saint_venant_elasticity_.assemble_grad(is_volume, n_basis, bases, gbases, cache, dt, displacement, displacement_prev, grad);
+#ifdef USE_GPU
 			else if (assembler == "NeoHookean")
 				neo_hookean_elasticity_.assemble_grad(is_volume, n_basis, bases, gbases, cache, dt, displacement, displacement_prev, grad);
+				// neo_hookean_elasticity_.assemble_grad_GPU(is_volume, n_basis, bases, gbases, cache, displacement, grad);
+#endif
+#ifndef USE_GPU
+			else if (assembler == "NeoHookean")
+			{
+				neo_hookean_elasticity_.assemble_grad(is_volume, n_basis, bases, gbases, cache, dt, displacement, displacement_prev, grad);
+			}
+#endif
 			else if (assembler == "MultiModels")
 				multi_models_elasticity_.assemble_grad(is_volume, n_basis, bases, gbases, cache, dt, displacement, displacement_prev, grad);
 			else if (assembler == "Damping")

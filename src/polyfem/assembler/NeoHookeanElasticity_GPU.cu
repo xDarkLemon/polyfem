@@ -1,7 +1,10 @@
 #include "NeoHookeanElasticity.hpp"
 #include <polyfem/basis/Basis.hpp>
 #include <polyfem/autogen/auto_elasticity_rhs.hpp>
+
+#include "CUDA_utilities.cuh"
 #include "cublas_v2.h"
+
 #include <polyfem/utils/MatrixUtils.hpp>
 #include <igl/Timer.h>
 
@@ -129,7 +132,7 @@ namespace polyfem
 					{
 						for (int d = 0; d < _size; ++d)
 						{
-							//threads allocation jumps the size of the respective vectors
+							// threads allocation jumps the size of the respective vectors
 							local_dispv(i * _size + d) += global_data[b_index * n_loc_bases * global_vector_size + i * global_vector_size + ii].val * displacement[global_data[b_index * n_loc_bases * global_vector_size + i * global_vector_size + ii].index * _size + d];
 						}
 					}
@@ -158,7 +161,7 @@ namespace polyfem
 						jac_it(k) = T(jac_it_array[b_index * n_pts + p](k));
 					def_grad = def_grad * jac_it;
 
-					//Id + grad d
+					// Id + grad d
 					for (int d = 0; d < _size; ++d)
 						def_grad(d, d) += T(1);
 
@@ -217,7 +220,7 @@ namespace polyfem
 					{
 						for (int d = 0; d < size_; ++d)
 						{
-							//threads allocation jumps the size of the respective vectors
+							// threads allocation jumps the size of the respective vectors
 							local_disp(i, d) += global_data[b_index * n_loc_bases * global_vector_size + i * global_vector_size + ii].val * displacement[global_data[b_index * n_loc_bases * global_vector_size + i * global_vector_size + ii].index * size_ + d];
 						}
 					}
@@ -238,7 +241,7 @@ namespace polyfem
 					for (long k = 0; k < jac_it.size(); ++k)
 						jac_it(k) = jac_it_array[b_index * n_pts + p](k);
 
-					//Id + grad d
+					// Id + grad d
 					def_grad = local_disp.transpose() * grad * jac_it + Eigen::Matrix<double, dim, dim>::Identity(size_, size_);
 
 					double J;
@@ -351,8 +354,8 @@ namespace polyfem
 															int size_inner,
 															double *computed_values)
 		{
-			//constexpr int N = (n_basis == Eigen::Dynamic) ? Eigen::Dynamic : n_basis * dim;
-			//const int n_pts = da.size();
+			// constexpr int N = (n_basis == Eigen::Dynamic) ? Eigen::Dynamic : n_basis * dim;
+			// const int n_pts = da.size();
 			Eigen::Matrix<double, -1, -1> thread_values(size_inner, 1);
 			thread_values.setZero();
 
@@ -362,7 +365,7 @@ namespace polyfem
 			int tx = threadIdx.x;
 			int b_index = bx * NUMBER_THREADS + tx;
 
-			//EACH THREAD SHOULD HAVE ITS OWN HESSIAN
+			// EACH THREAD SHOULD HAVE ITS OWN HESSIAN
 			Eigen::Matrix<double, -1, -1, 0, n_basis * dim, n_basis * dim> H(n_basis * dim, n_basis * dim);
 			H.setZero();
 
@@ -377,7 +380,7 @@ namespace polyfem
 					{
 						for (int d = 0; d < size_; ++d)
 						{
-							//threads allocation jumps the size of the respective vectors
+							// threads allocation jumps the size of the respective vectors
 							local_disp(i, d) += global_data[b_index * n_loc_bases * global_vector_size + i * global_vector_size + ii].val * displacement[global_data[b_index * n_loc_bases * global_vector_size + i * global_vector_size + ii].index * size_ + d];
 						}
 					}
@@ -395,7 +398,7 @@ namespace polyfem
 					for (long k = 0; k < jac_it.size(); ++k)
 						jac_it(k) = jac_it_array[b_index * n_pts + p](k);
 
-					//Id + grad d
+					// Id + grad d
 					def_grad = local_disp.transpose() * grad * jac_it + Eigen::Matrix<double, dim, dim>::Identity(size_, size_);
 
 					double J;
@@ -441,14 +444,14 @@ namespace polyfem
 						del2J_delF2.template block<dim, dim>(6, 3) = kernel_hat<dim>(u);
 					}
 
-					//CHECK THE ID AND MAPPING
+					// CHECK THE ID AND MAPPING
 					Eigen::Matrix<double, dim * dim, dim *dim> id = Eigen::Matrix<double, dim * dim, dim * dim>::Identity(size_ * size_, size_ * size_);
 
 					Eigen::Matrix<double, dim * dim, 1> g_j = Eigen::Map<const Eigen::Matrix<double, dim * dim, 1>>(delJ_delF.data(), delJ_delF.size());
 
 					Eigen::Matrix<double, dim * dim, dim *dim> hessian_temp = (mu[p] * id) + (((mu[p] + lambda[p] * (1 - log_det_j)) / (J * J)) * (g_j * g_j.transpose())) + (((lambda[p] * log_det_j - mu[p]) / (J)) * del2J_delF2);
 
-					//NOT DYNAMIC YET (n_basis * dim <--> N)
+					// NOT DYNAMIC YET (n_basis * dim <--> N)
 					Eigen::Matrix<double, dim * dim, n_basis * dim> delF_delU_tensor(jac_it.size(), grad.size());
 
 					for (size_t i = 0; i < local_disp.rows(); ++i)
@@ -464,14 +467,14 @@ namespace polyfem
 						}
 					}
 
-					//NOT DYNAMIC YET (n_basis * dim <--> N)
+					// NOT DYNAMIC YET (n_basis * dim <--> N)
 					Eigen::Matrix<double, n_basis * dim, n_basis *dim> hessian = delF_delU_tensor.transpose() * hessian_temp * delF_delU_tensor;
 
 					double val = mu[p] / 2 * ((def_grad.transpose() * def_grad).trace() - size_ - 2 * log_det_j) + lambda[p] / 2 * log_det_j * log_det_j;
 
 					H += hessian * da[b_index](p);
 				}
-				//syncthreads
+				// syncthreads
 				for (int i = 0; i < n_loc_bases; ++i)
 				{
 					for (int j = 0; j < n_loc_bases; ++j)
@@ -516,22 +519,6 @@ namespace polyfem
 			}
 		}
 
-		__global__ void print_test(int *outer, int size_outer, int *inner, int size_inner)
-		{
-			int n1 = 0, n2 = 0, n3 = 0, n4 = 0;
-			n1 = kernel_mapping(outer, size_outer, inner, size_inner, 0, 1);
-			printf("\n %d %d %d %d\n", n1, n2, n3, n4);
-		}
-		__global__ void test_values_ext(double *values)
-		{
-			for (int i = 0; i < 2700; i++)
-				values[i] = 1 + i;
-		}
-
-		void NeoHookeanElasticity::print_test_wrapper(int *outer, int size_outer, int *inner, int size_inner) const
-		{
-			print_test<<<1, 1>>>(outer, size_outer, inner, size_inner);
-		}
 		int NeoHookeanElasticity::compute_energy_gpu(double *displacement_dev_ptr,
 													 Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, 0, 3, 3> *jac_it_dev_ptr,
 													 Local2Global *global_data_dev_ptr,
@@ -596,7 +583,7 @@ namespace polyfem
 					compute_energy_aux_gradient_fast_GPU<Eigen::Dynamic, 2><<<grid, threads, n_basis * size() * sizeof(double)>>>(n_basis, displacement_dev_ptr, jac_it_dev_ptr, global_data_dev_ptr, da_dev_ptr, grad_dev_ptr, n_bases, n_loc_bases, global_vector_size, n_pts, size(), lambda, mu, vec_ptr);
 				}
 			}
-			else //if (size() == 3)
+			else // if (size() == 3)
 			{
 				assert(size() == 3);
 				if (n_loc_bases == 4)
@@ -622,7 +609,7 @@ namespace polyfem
 			return vec;
 		}
 
-		//LETS DO A RETURN
+		// LETS DO A RETURN
 		std::vector<double>
 		NeoHookeanElasticity::assemble_hessian_GPU(double *displacement_dev_ptr,
 												   Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, 0, 3, 3> *jac_it_dev_ptr,
@@ -654,7 +641,7 @@ namespace polyfem
 					  << ":" << sharedMemoryBytes
 					  << std::endl;
 
-			//Eigen::Matrix<double, -1, -1, 0, x, x>> hessian;
+			// Eigen::Matrix<double, -1, -1, 0, x, x>> hessian;
 			if (size() == 2)
 			{
 				if (n_loc_bases == 3)
@@ -791,17 +778,17 @@ namespace polyfem
 																											   computed_values_ptr);
 				}
 			}
-			//CHECK_LAST_CUDA_ERROR();
+			// CHECK_LAST_CUDA_ERROR();
 
 			gpuErrchk(cudaPeekAtLastError());
 			CHECK_CUDA_ERROR(cudaDeviceSynchronize());
-			//gpuErrchk(cudaDeviceSynchronize());
+			// gpuErrchk(cudaDeviceSynchronize());
 			thrust::copy(computed_values_dev.begin(), computed_values_dev.end(), computed_values.begin());
 			// empty the vector
-			//computed_values_dev.clear();
+			// computed_values_dev.clear();
 
 			// deallocate any capacity which may currently be associated with vec
-			//computed_values.shrink_to_fit();
+			// computed_values.shrink_to_fit();
 			return computed_values;
 		}
 

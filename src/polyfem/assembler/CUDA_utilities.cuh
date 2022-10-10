@@ -3,6 +3,13 @@
 #include <cuda_runtime.h>
 #include <stdio.h>
 
+// Thrust utilities
+#include <thrust/functional.h>
+#include <thrust/reduce.h>
+#include <thrust/device_vector.h>
+#include <thrust/copy.h>
+#include <thrust/host_vector.h>
+
 #define NUMBER_THREADS 32
 #define gpuErrchk(ans)                        \
 	{                                         \

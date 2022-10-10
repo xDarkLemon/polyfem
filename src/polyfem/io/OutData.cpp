@@ -1642,7 +1642,7 @@ namespace polyfem::io
 				ipc::construct_friction_constraint_set(
 					collision_mesh, displaced_surface, constraint_set,
 					dhat, barrier_stiffness, friction_coefficient,
-					friction_constraint_set);
+					friction_constraint_set, 0);
 
 				double dt = 1;
 				if (dt_in > 0)

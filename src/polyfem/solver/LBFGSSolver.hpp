@@ -43,6 +43,15 @@ namespace cppoptlib
 			const TVector &grad,
 			TVector &direction) override;
 
+		//	virtual bool compute_update_direction_gpu(
+		//		ProblemType &objFunc,
+		//		const Eigen::Matrix<double, -1, 1> &x,
+		//		const Eigen::Matrix<double, -1, 1> &grad,
+		//		Eigen::Matrix<double, -1, 1> &direction) override
+		//	{
+		//		return true;
+		//	}
+
 		LBFGSpp::BFGSMat<Scalar> m_bfgs; // Approximation to the Hessian matrix
 
 		/// The number of corrections to approximate the inverse Hessian matrix.

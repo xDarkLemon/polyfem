@@ -27,6 +27,48 @@ namespace polyfem::assembler
 
 		double compute_energy(const NonLinearAssemblerData &data) const;
 
+		// energy, gradient, and hessian used in newton method for GPU version
+		std::vector<double> assemble_hessian_GPU(double *displacement_dev_ptr,
+												 Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, 0, 3, 3> *jac_it_dev_ptr,
+												 basis::Local2Global_GPU *global_data_dev_ptr,
+												 Eigen::Matrix<double, -1, 1, 0, 3, 1> *da_dev_ptr,
+												 Eigen::Matrix<double, -1, -1, 0, 3, 3> *grad_dev_ptr,
+												 int n_bases,
+												 int n_loc_bases,
+												 int global_vector_size,
+												 int n_pts,
+												 double *lambda,
+												 double *mu,
+												 int *outer_index,
+												 int size_outer,
+												 int *inner_index,
+												 int size_inner) const;
+
+		Eigen::VectorXd assemble_grad_GPU(double *displacement_dev_ptr,
+										  Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, 0, 3, 3> *jac_it_dev_ptr,
+										  basis::Local2Global *global_data_dev_ptr,
+										  Eigen::Matrix<double, -1, 1, 0, 3, 1> *da_dev_ptr,
+										  Eigen::Matrix<double, -1, -1, 0, 3, 3> *grad_dev_ptr,
+										  int n_bases,
+										  int n_loc_bases,
+										  int global_columns_N,
+										  int n_pts,
+										  double *lambda_ptr,
+										  double *mu_ptr,
+										  int n_basis) const;
+
+		int compute_energy_gpu(double *displacement_dev_ptr,
+							   Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, 0, 3, 3> *jac_it_dev_ptr,
+							   basis::Local2Global *global_data_dev_ptr,
+							   Eigen::Matrix<double, -1, 1, 0, 3, 1> *da_dev_ptr,
+							   Eigen::Matrix<double, -1, 1, 0, 3, 1> *grad_dev_ptr,
+							   int n_bases,
+							   int n_loc_bases,
+							   int global_vector_size,
+							   int n_pts,
+							   double *lambda,
+							   double *mu) const;
+
 		// rhs for fabbricated solution, compute with automatic sympy code
 		Eigen::Matrix<double, Eigen::Dynamic, 1, 0, 3, 1>
 		compute_rhs(const AutodiffHessianPt &pt) const;
@@ -44,6 +86,9 @@ namespace polyfem::assembler
 		// sets material params
 		void add_multimaterial(const int index, const json &params);
 		void set_params(const LameParameters &params) { params_ = params; }
+
+		// return material params
+		void get_lambda_mu(const Eigen::MatrixXd &param, const Eigen::MatrixXd &p, int el_id, double &lambda, double &mu) const;
 
 	private:
 		int size_ = -1;

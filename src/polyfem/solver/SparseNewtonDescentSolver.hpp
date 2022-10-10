@@ -52,6 +52,21 @@ namespace cppoptlib
 		using Superclass::descent_strategy_name;
 		std::string descent_strategy_name(int descent_strategy) const override;
 
+		//		bool compute_update_direction_cuda(
+		//			ProblemType &objFunc,
+		//			const Eigen::Matrix<double, -1, 1> &x,
+		//			const Eigen::Matrix<double, -1, 1> &grad,
+		//			Eigen::Matrix<double, -1, 1> &direction);
+		//
+		//	virtual bool compute_update_direction_gpu(
+		//		ProblemType &objFunc,
+		//		const Eigen::Matrix<double, -1, 1> &x,
+		//		const Eigen::Matrix<double, -1, 1> &grad,
+		//		Eigen::Matrix<double, -1, 1> &direction) override
+		//	{
+		//		return compute_update_direction_cuda(objFunc, x, grad, direction);
+		//	}
+
 		spdlog::level::level_enum log_level() const
 		{
 			return this->descent_strategy == 2 ? spdlog::level::warn : spdlog::level::debug;

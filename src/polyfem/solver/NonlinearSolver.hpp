@@ -34,7 +34,7 @@ namespace cppoptlib
 		void set_line_search(const std::string &line_search_name);
 
 		void minimize(ProblemType &objFunc, TVector &x);
-
+		//	void minimize_gpu(ProblemType &objFunc, Eigen::Matrix<double, -1, 1> &x);
 		double line_search(const TVector &x, const TVector &delta_x, ProblemType &objFunc);
 
 		void get_info(polyfem::json &params) { params = solver_info; }
@@ -59,7 +59,7 @@ namespace cppoptlib
 		virtual void reset(const int ndof);
 
 		// Compute the search/update direction
-		virtual bool compute_update_direction_gpu(ProblemType &objFunc, const Eigen::Matrix<double, -1, 1> &x_vec, const Eigen::Matrix<double, -1, 1> &grad, Eigen::Matrix<double, -1, 1> &direction) = 0;
+		// virtual bool compute_update_direction_gpu(ProblemType &objFunc, const Eigen::Matrix<double, -1, 1> &x_vec, const Eigen::Matrix<double, -1, 1> &grad, Eigen::Matrix<double, -1, 1> &direction) = 0;
 		virtual bool compute_update_direction(ProblemType &objFunc, const TVector &x_vec, const TVector &grad, TVector &direction) = 0;
 
 		virtual int default_descent_strategy() = 0;

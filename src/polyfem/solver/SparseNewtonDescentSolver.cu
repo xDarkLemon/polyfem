@@ -18,6 +18,32 @@
 
 namespace cppoptlib
 {
+    def check_cuda_mem()
+    {
+        static int flag_gpu_settings = 0;
+        if (!flag_gpu_settings)
+        {
+            size_t free_bytes = 0, total_bytes = 0;
+            cudaMemGetInfo(&free_bytes, &total_bytes);
+            std::cout << "Mem GPU Free : " << free_bytes << " bytes" << std::endl;
+            std::cout << "Mem GPU Total: " << total_bytes << " bytes" << std::endl;
+            size_t sizeLimit = 0;
+            cudaDeviceGetLimit(&sizeLimit, cudaLimitMallocHeapSize);
+            std::cout << "Original device heap sizeLimit: " << sizeLimit << std::endl;
+
+            //cudaDeviceSetLimit( cudaLimitMallocHeapSize, free_bytes );
+
+            //cudaDeviceGetLimit( &sizeLimit, cudaLimitMallocHeapSize );
+            //std::cout << "Current device heap sizeLimit: " << sizeLimit << std::endl;
+            /*
+            std::cout << "SharedMemoryRequired: "
+            << ":" << size_inner_index*sizeof(double)
+            << std::endl;
+            */
+            flag_gpu_settings++;
+        }
+    }
+
 	template <typename ProblemType>
 	bool SparseNewtonDescentSolver<ProblemType>::compute_update_direction_cuda(
 			ProblemType &objFunc,
@@ -90,7 +116,12 @@ namespace cppoptlib
         double alpha = 1.0;
         double beta = 0.0;
         
+        printf("before allocating hessian_dev:\n");
+        check_cuda_mem();
         hessian_dev = ALLOCATE_GPU<double>(hessian_dev, N*N*sizeof(double));
+        printf("after allocating hessian_dev:\n");
+        check_cuda_mem();
+
         direction_dev = ALLOCATE_GPU<double>(direction_dev, N*sizeof(double));
         grad_dev = ALLOCATE_GPU<double>(grad_dev, N*sizeof(double));
         tmp_dev = ALLOCATE_GPU<double>(tmp_dev, N*sizeof(double));

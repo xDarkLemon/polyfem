@@ -76,6 +76,6 @@ namespace polyfem::solver
 
 		ipc::construct_friction_constraint_set(
 			collision_mesh_, displaced_surface, constraint_set,
-			dhat_, contact_form_.barrier_stiffness(), mu_, friction_constraint_set_);
+			dhat_, contact_form_.barrier_stiffness(), mu_, friction_constraint_set_, 0);
 	}
 } // namespace polyfem::solver

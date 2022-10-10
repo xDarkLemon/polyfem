@@ -222,31 +222,32 @@ namespace polyfem
 											   const Eigen::MatrixXd &displacement_prev) const
 		{
 			if (assembler == "SaintVenant")
-<<<<<<< HEAD
-				return saint_venant_elasticity_.assemble(is_volume, bases, gbases, cache, displacement);
+
+				return saint_venant_elasticity_.assemble(is_volume, bases, gbases, cache, dt, displacement, displacement_prev);
 #ifdef USE_GPU
 			else if (assembler == "NeoHookean")
 			{
-				return neo_hookean_elasticity_.assemble(is_volume, bases, gbases, cache, displacement);
+				return neo_hookean_elasticity_.assemble(is_volume, bases, gbases, cache, dt, displacement, displacement_prev);
 				//	return neo_hookean_elasticity_.assemble_GPU(is_volume, bases, gbases, cache, displacement);
 			}
 #endif
 #ifndef USE_GPU
 			else if (assembler == "NeoHookean")
 			{
-				return neo_hookean_elasticity_.assemble(is_volume, bases, gbases, cache, displacement);
+				return neo_hookean_elasticity_.assemble(is_volume, bases, gbases, cache, dt, displacement, displacement_prev);
 			}
 #endif
-			== == == = return saint_venant_elasticity_.assemble(is_volume, bases, gbases, cache, dt, displacement, displacement_prev);
-			else if (assembler == "NeoHookean") return neo_hookean_elasticity_.assemble(is_volume, bases, gbases, cache, dt, displacement, displacement_prev);
->>>>>>> 52c2dca9caa6b20152111a9309089a3d6be2fc54
-			else if (assembler == "MultiModels") return multi_models_elasticity_.assemble(is_volume, bases, gbases, cache, dt, displacement, displacement_prev);
-			else if (assembler == "Damping") return damping_.assemble(is_volume, bases, gbases, cache, dt, displacement, displacement_prev);
+			else if (assembler == "MultiModels")
+				return multi_models_elasticity_.assemble(is_volume, bases, gbases, cache, dt, displacement, displacement_prev);
+			else if (assembler == "Damping")
+				return damping_.assemble(is_volume, bases, gbases, cache, dt, displacement, displacement_prev);
 
 			// else if(assembler == "Ogden")
 			//	return ogden_elasticity_.assemble(is_volume, bases, gbases, cache, dt, displacement, displacement_prev);
-			else if (assembler == "LinearElasticity") return linear_elasticity_energy_.assemble(is_volume, bases, gbases, cache, dt, displacement, displacement_prev);
-			else return 0;
+			else if (assembler == "LinearElasticity")
+				return linear_elasticity_energy_.assemble(is_volume, bases, gbases, cache, dt, displacement, displacement_prev);
+			else
+				return 0;
 		}
 
 		void AssemblerUtils::assemble_energy_gradient(const std::string &assembler,
@@ -261,23 +262,18 @@ namespace polyfem
 													  Eigen::MatrixXd &grad) const
 		{
 			if (assembler == "SaintVenant")
-<<<<<<< HEAD
-				saint_venant_elasticity_.assemble_grad(is_volume, n_basis, bases, gbases, cache, displacement, grad);
+				saint_venant_elasticity_.assemble_grad(is_volume, n_basis, bases, gbases, cache, dt, displacement, displacement_prev, grad);
 #ifdef USE_GPU
 			else if (assembler == "NeoHookean")
-				neo_hookean_elasticity_.assemble_grad(is_volume, n_basis, bases, gbases, cache, displacement, grad);
+				neo_hookean_elasticity_.assemble_grad(is_volume, n_basis, bases, gbases, cache, dt, displacement, displacement_prev, grad);
 				// neo_hookean_elasticity_.assemble_grad_GPU(is_volume, n_basis, bases, gbases, cache, displacement, grad);
 #endif
 #ifndef USE_GPU
 			else if (assembler == "NeoHookean")
 			{
-				neo_hookean_elasticity_.assemble_grad(is_volume, n_basis, bases, gbases, cache, displacement, grad);
+				neo_hookean_elasticity_.assemble_grad(is_volume, n_basis, bases, gbases, cache, dt, displacement, displacement_prev, grad);
 			}
 #endif
-			== == == = saint_venant_elasticity_.assemble_grad(is_volume, n_basis, bases, gbases, cache, dt, displacement, displacement_prev, grad);
-			else if (assembler == "NeoHookean")
-				neo_hookean_elasticity_.assemble_grad(is_volume, n_basis, bases, gbases, cache, dt, displacement, displacement_prev, grad);
->>>>>>> 52c2dca9caa6b20152111a9309089a3d6be2fc54
 			else if (assembler == "MultiModels")
 				multi_models_elasticity_.assemble_grad(is_volume, n_basis, bases, gbases, cache, dt, displacement, displacement_prev, grad);
 			else if (assembler == "Damping")
@@ -288,7 +284,8 @@ namespace polyfem
 				linear_elasticity_energy_.assemble_grad(is_volume, n_basis, bases, gbases, cache, dt, displacement, displacement_prev, grad);
 			// else if(assembler == "Ogden")
 			//	ogden_elasticity_.assemble_grad(is_volume, n_basis, bases, gbases, cache, dt, displacement, displacement_prev, grad);
-			else return;
+			else
+				return;
 		}
 
 		void AssemblerUtils::assemble_energy_hessian(const std::string &assembler,

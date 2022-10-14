@@ -109,8 +109,10 @@ namespace polyfem
 
 	void State::solve_transient_tensor_nonlinear(const int time_steps, const double t0, const double dt)
 	{
+#ifdef USE_GPU
+		sending_data_to_GPU();
+#endif
 		init_nonlinear_tensor_solve(t0 + dt);
-
 		save_timestep(t0, 0, t0, dt);
 
 		for (int t = 1; t <= time_steps; ++t)
@@ -137,6 +139,150 @@ namespace polyfem
 			resolve_output_path(args["output"]["data"]["u_path"]),
 			resolve_output_path(args["output"]["data"]["v_path"]),
 			resolve_output_path(args["output"]["data"]["a_path"]));
+	}
+
+	void State::sending_data_to_GPU()
+	{
+		logger().info("Start moving data to GPU");
+
+		// NEED TO FIND A WAY TO AVOID RECOMPUTATION OF PARAMETERS
+		LameParameters params_tmp_;
+
+		auto is_vol_ = mesh->is_volume();
+		const auto &body_params = args["materials"];
+		std::map<int, json> materials;
+		for (int i = 0; i < body_params.size(); ++i)
+		{
+			json mat = body_params[i];
+			json id = mat["id"];
+			if (id.is_array())
+			{
+				for (int j = 0; j < id.size(); ++j)
+					materials[id[j]] = mat;
+			}
+			else
+			{
+				const int mid = id;
+				materials[mid] = mat;
+			}
+		}
+
+		for (int e = 0; e < mesh->n_elements(); ++e)
+		{
+			const int bid = mesh->get_body_id(e);
+			const auto it = materials.find(bid);
+			if (it == materials.end())
+			{
+				continue;
+			}
+
+			const json &tmp = it->second;
+			params_tmp_.add_multimaterial(e, tmp, is_vol_);
+		}
+
+		int n_elements = 0;
+		int jac_it_size = 0;
+		int n_loc_bases = 0;
+		int global_vector_size = 0;
+		int n_pts = 0;
+
+		Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, 0, 3, 3> *jac_it_dev_ptr = nullptr;
+		basis::Local2Global_GPU *global_data_dev_ptr = nullptr;
+		Eigen::Matrix<double, -1, 1, 0, 3, 1> *da_dev_ptr = nullptr;
+		Eigen::Matrix<double, -1, -1, 0, 3, 3> *grad_dev_ptr = nullptr;
+		double *lambda_ptr = nullptr;
+		double *mu_ptr = nullptr;
+
+		n_elements = int(bases.size());
+
+		std::vector<polyfem::assembler::ElementAssemblyValues> vals_array(n_elements);
+
+		auto g_bases = geom_bases();
+		for (int e = 0; e < n_elements; ++e)
+		{
+			ass_vals_cache.compute(e, is_vol_, bases[e], g_bases[e], vals_array[e]);
+		}
+
+		logger().info("Finished computing cache for GPU");
+		jac_it_size = vals_array[0].jac_it.size();
+		n_loc_bases = vals_array[0].basis_values.size();
+		global_vector_size = vals_array[0].basis_values[0].global.size();
+
+		int check_size_1 = sizeof(Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, 0, 3, 3>);
+		jac_it_dev_ptr = ALLOCATE_GPU(jac_it_dev_ptr, sizeof(Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, 0, 3, 3>) * n_elements * jac_it_size);
+
+		std::vector<basis::Local2Global_GPU> global_data_host(n_elements * n_loc_bases * global_vector_size);
+
+		global_data_dev_ptr = ALLOCATE_GPU(global_data_dev_ptr, sizeof(basis::Local2Global_GPU) * n_elements * n_loc_bases * global_vector_size);
+
+		std::vector<Eigen::Matrix<double, -1, 1, 0, 3, 1>> da_host(n_elements);
+
+		for (int e = 0; e < n_elements; ++e)
+		{
+			int N = vals_array[e].det.size();
+			da_host[e].resize(N, 1);
+			da_host[e] = vals_array[e].det.array() * vals_array[e].quadrature.weights.array();
+
+			COPYDATATOGPU(jac_it_dev_ptr + e * jac_it_size, vals_array[e].jac_it.data(), sizeof(Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, 0, 3, 3>) * jac_it_size);
+			for (int f = 0; f < n_loc_bases; f++)
+			{
+				for (int g = 0; g < global_vector_size; g++)
+				{
+					global_data_host[e * (n_loc_bases * global_vector_size) + f * global_vector_size + g].index = vals_array[e].basis_values[f].global[g].index;
+					global_data_host[e * (n_loc_bases * global_vector_size) + f * global_vector_size + g].val = vals_array[e].basis_values[f].global[g].val;
+				}
+			}
+		}
+		COPYDATATOGPU(global_data_dev_ptr, global_data_host.data(), sizeof(basis::Local2Global_GPU) * n_elements * n_loc_bases * global_vector_size);
+
+		da_dev_ptr = ALLOCATE_GPU(da_dev_ptr, sizeof(Eigen::Matrix<double, -1, 1, 0, 3, 1>) * n_elements);
+		COPYDATATOGPU(da_dev_ptr, da_host.data(), sizeof(Eigen::Matrix<double, -1, 1, 0, 3, 1>) * n_elements);
+
+		n_pts = da_host[0].size();
+
+		grad_dev_ptr = ALLOCATE_GPU(grad_dev_ptr, sizeof(Eigen::Matrix<double, -1, -1, 0, 3, 3>) * n_elements * n_loc_bases * n_pts);
+
+		for (int e = 0; e < n_elements; ++e)
+		{
+			for (int f = 0; f < n_loc_bases; f++)
+			{
+				Eigen::Matrix<double, -1, -1, 0, 3, 3> row_(Eigen::Map<Eigen::Matrix<double, -1, -1, 0, 3, 3>>(vals_array[e].basis_values[f].grad.data(), 3, 3));
+				COPYDATATOGPU(grad_dev_ptr + e * n_loc_bases + f, &row_, sizeof(Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, 0, 3, 3>));
+			}
+		}
+
+		double lambda, mu;
+		lambda_ptr = ALLOCATE_GPU(lambda_ptr, sizeof(double) * n_elements * n_pts);
+		mu_ptr = ALLOCATE_GPU(mu_ptr, sizeof(double) * n_elements * n_pts);
+
+		for (int e = 0; e < n_elements; ++e)
+		{
+			for (int p = 0; p < n_pts; p++)
+			{
+				params_tmp_.lambda_mu(vals_array[e].quadrature.points.row(p), vals_array[e].val.row(p), vals_array[e].element_id, lambda, mu);
+				COPYDATATOGPU(lambda_ptr + e * n_pts + p, &lambda, sizeof(double));
+				COPYDATATOGPU(mu_ptr + e * n_pts + p, &mu, sizeof(double));
+			}
+		}
+
+		logger().info("Finished moving data to GPU");
+
+		gpuErrchk(cudaPeekAtLastError());
+		CHECK_CUDA_ERROR(cudaDeviceSynchronize());
+		data_gpu_.n_elements = n_elements;
+		data_gpu_.jac_it_size = jac_it_size;
+		data_gpu_.n_loc_bases = n_loc_bases;
+		data_gpu_.global_vector_size = global_vector_size;
+		data_gpu_.n_pts = n_pts;
+
+		data_gpu_.jac_it_dev_ptr = jac_it_dev_ptr;
+		data_gpu_.global_data_dev_ptr = global_data_dev_ptr;
+		data_gpu_.da_dev_ptr = da_dev_ptr;
+		data_gpu_.grad_dev_ptr = grad_dev_ptr;
+		data_gpu_.mu_ptr = mu_ptr;
+		data_gpu_.lambda_ptr = lambda_ptr;
+
+		return;
 	}
 
 	void State::init_nonlinear_tensor_solve(const double t)
@@ -175,7 +321,7 @@ namespace polyfem
 			assembler, ass_vals_cache,
 			formulation(),
 			problem->is_time_dependent() ? args["time"]["dt"].get<double>() : 0.0,
-			mesh->is_volume());
+			mesh->is_volume(), data_gpu_);
 		forms.push_back(solve_data.elastic_form);
 
 		solve_data.body_form = std::make_shared<BodyForm>(
@@ -204,7 +350,7 @@ namespace polyfem
 					assembler, ass_vals_cache,
 					"Damping",
 					args["time"]["dt"],
-					mesh->is_volume());
+					mesh->is_volume(), data_gpu_);
 				forms.push_back(solve_data.damping_form);
 			}
 		}

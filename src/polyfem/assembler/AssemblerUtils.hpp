@@ -87,6 +87,17 @@ namespace polyfem
 								   const Eigen::MatrixXd &displacement,
 								   const Eigen::MatrixXd &displacement_prev) const;
 
+			// Non linear energy, assembler is the name of the formulation
+			double assemble_energy_GPU(const std::string &assembler,
+									   const bool is_volume,
+									   const std::vector<basis::ElementBases> &bases,
+									   const std::vector<basis::ElementBases> &gbases,
+									   const AssemblyValsCache &cache,
+									   const double dt,
+									   const Eigen::MatrixXd &displacement,
+									   const Eigen::MatrixXd &displacement_prev,
+									   const DATA_POINTERS_GPU &data_gpu) const;
+
 			// non linear gradient, assembler is the name of the formulation
 			void assemble_energy_gradient(const std::string &assembler,
 										  const bool is_volume,
@@ -98,6 +109,19 @@ namespace polyfem
 										  const Eigen::MatrixXd &displacement,
 										  const Eigen::MatrixXd &displacement_prev,
 										  Eigen::MatrixXd &grad) const;
+
+			// non linear gradient, assembler is the name of the formulation
+			void assemble_energy_gradient_GPU(const std::string &assembler,
+											  const bool is_volume,
+											  const int n_basis,
+											  const std::vector<basis::ElementBases> &bases,
+											  const std::vector<basis::ElementBases> &gbases,
+											  const AssemblyValsCache &cache,
+											  const double dt,
+											  const Eigen::MatrixXd &displacement,
+											  const Eigen::MatrixXd &displacement_prev,
+											  Eigen::MatrixXd &grad,
+											  const DATA_POINTERS_GPU &data_gpu) const;
 			// non-linear hessian, assembler is the name of the formulation
 			void assemble_energy_hessian(const std::string &assembler,
 										 const bool is_volume,
@@ -111,6 +135,20 @@ namespace polyfem
 										 const Eigen::MatrixXd &displacement_prev,
 										 utils::SpareMatrixCache &mat_cache,
 										 StiffnessMatrix &hessian) const;
+
+			void assemble_energy_hessian_GPU(const std::string &assembler,
+											 const bool is_volume,
+											 const int n_basis,
+											 const bool project_to_psd,
+											 const std::vector<basis::ElementBases> &bases,
+											 const std::vector<basis::ElementBases> &gbases,
+											 const AssemblyValsCache &cache,
+											 const double dt,
+											 const Eigen::MatrixXd &displacement,
+											 const Eigen::MatrixXd &displacement_prev,
+											 utils::SpareMatrixCache &mat_cache,
+											 StiffnessMatrix &hessian,
+											 const DATA_POINTERS_GPU &data_gpu) const;
 
 			// plotting (eg von mises), assembler is the name of the formulation
 			void compute_scalar_value(const std::string &assembler,
@@ -166,7 +204,7 @@ namespace polyfem
 
 			bool has_damping() const;
 
-			//gets the names of all assemblers
+			// gets the names of all assemblers
 			static std::vector<std::string> scalar_assemblers();
 			static std::vector<std::string> tensor_assemblers();
 			// const std::vector<std::string> &mixed_assemblers() const { return mixed_assemblers_; }

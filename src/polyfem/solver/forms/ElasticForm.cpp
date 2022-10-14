@@ -13,7 +13,8 @@ namespace polyfem::solver
 							 const assembler::AssemblyValsCache &ass_vals_cache,
 							 const std::string &formulation,
 							 const double dt,
-							 const bool is_volume)
+							 const bool is_volume,
+							 DATA_POINTERS_GPU &data_gpu)
 		: n_bases_(n_bases),
 		  bases_(bases),
 		  geom_bases_(geom_bases),
@@ -21,7 +22,8 @@ namespace polyfem::solver
 		  ass_vals_cache_(ass_vals_cache),
 		  formulation_(formulation),
 		  dt_(dt),
-		  is_volume_(is_volume)
+		  is_volume_(is_volume),
+		  data_gpu_(data_gpu)
 	{
 		if (assembler_.is_linear(formulation_))
 			compute_cached_stiffness();
@@ -37,9 +39,17 @@ namespace polyfem::solver
 	void ElasticForm::first_derivative_unweighted(const Eigen::VectorXd &x, Eigen::VectorXd &gradv) const
 	{
 		Eigen::MatrixXd grad;
+
+#ifdef USE_GPU
+		assembler_.assemble_energy_gradient_GPU(
+			formulation_, is_volume_, n_bases_, bases_, geom_bases_,
+			ass_vals_cache_, dt_, x, x_prev_, grad, data_gpu_);
+#endif
+#ifndef USE_GPU
 		assembler_.assemble_energy_gradient(
 			formulation_, is_volume_, n_bases_, bases_, geom_bases_,
 			ass_vals_cache_, dt_, x, x_prev_, grad);
+#endif
 		gradv = grad;
 	}
 
@@ -56,10 +66,17 @@ namespace polyfem::solver
 		}
 		else
 		{
+#ifdef USE_GPU
+			assembler_.assemble_energy_hessian_GPU(
+				formulation_, is_volume_, n_bases_, project_to_psd_, bases_,
+				geom_bases_, ass_vals_cache_, dt_, x, x_prev_, mat_cache_, hessian, data_gpu_);
+#endif
+#ifndef USE_GPU
 			// TODO: somehow remove mat_cache_ so this function can be marked const
 			assembler_.assemble_energy_hessian(
 				formulation_, is_volume_, n_bases_, project_to_psd_, bases_,
 				geom_bases_, ass_vals_cache_, dt_, x, x_prev_, mat_cache_, hessian);
+#endif
 		}
 	}
 

@@ -6,6 +6,9 @@
 #include <polyfem/utils/MatrixUtils.hpp>
 #include <polyfem/utils/ElasticityUtils.hpp>
 
+#include "polyfem/utils/CUDA_utilities.cuh"
+#include "cublas_v2.h"
+
 #include <Eigen/Sparse>
 #include <vector>
 #include <iostream>
@@ -108,31 +111,21 @@ namespace polyfem::assembler
 			const Eigen::MatrixXd &displacement_prev) const;
 
 		void assemble_grad_GPU(
-			const bool is_volume,
+			const DATA_POINTERS_GPU &data_gpu,
 			const int n_basis,
-			const std::vector<basis::ElementBases> &bases,
-			const std::vector<basis::ElementBases> &gbases,
-			const AssemblyValsCache &cache,
 			const Eigen::MatrixXd &displacement,
 			Eigen::MatrixXd &rhs) const;
 
 		void assemble_hessian_GPU(
-			const bool is_volume,
+			const DATA_POINTERS_GPU &data_gpu,
 			const int n_basis,
-			const bool project_to_psd,
-			const std::vector<basis::ElementBases> &bases,
-			const std::vector<basis::ElementBases> &gbases,
-			const AssemblyValsCache &cache,
 			const Eigen::MatrixXd &displacement,
 			utils::SpareMatrixCache &mat_cache,
 			StiffnessMatrix &grad,
 			mapping_pair **mapping) const;
 
 		double assemble_GPU(
-			const bool is_volume,
-			const std::vector<basis::ElementBases> &bases,
-			const std::vector<basis::ElementBases> &gbases,
-			const AssemblyValsCache &cache,
+			const DATA_POINTERS_GPU &data_gpu,
 			const Eigen::MatrixXd &displacement) const;
 
 		inline LocalAssembler &local_assembler() { return local_assembler_; }

@@ -37,6 +37,7 @@
 #include <ipc/collision_mesh.hpp>
 #include <ipc/utils/logger.hpp>
 
+#include <polyfem/utils/CUDA_utilities.cuh>
 // Forward declaration
 namespace cppoptlib
 {
@@ -260,9 +261,13 @@ namespace polyfem
 			return n_b_samples;
 		}
 
+		/// POINTERS AND SIZE ELEMENTS FOR GPU
+		DATA_POINTERS_GPU data_gpu_;
+
 	private:
 		/// splits the solution in solution and pressure for mixed problems
-		void sol_to_pressure();
+		void
+		sol_to_pressure();
 		/// builds bases for polygons, called inside build_basis
 		void build_polygonal_basis();
 
@@ -301,6 +306,8 @@ namespace polyfem
 		SolveData solve_data;
 		/// initialize solver
 		void init_solve();
+		/// sending data to GPU for Elastic form
+		void sending_data_to_GPU();
 		/// solves transient navier stokes with operator splitting
 		/// @param[in] time_steps number of time steps
 		/// @param[in] dt timestep size

@@ -10,7 +10,7 @@
 #include <thrust/device_vector.h>
 #include <thrust/copy.h>
 #include <thrust/host_vector.h>
-#include <polyfem/assembler/CUDA_utilities.cuh>
+#include <polyfem/utils/CUDA_utilities.cuh>
 
 #include <polyfem/assembler/ElementAssemblyValues.hpp>
 #include <polyfem/basis/ElementBases.hpp>
@@ -51,7 +51,7 @@ namespace polyfem::assembler
 		//			template <typename T>
 		Eigen::VectorXd assemble_grad_GPU(double *displacement_dev_ptr,
 										  Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, 0, 3, 3> *jac_it_dev_ptr,
-										  basis::Local2Global *global_data_dev_ptr,
+										  basis::Local2Global_GPU *global_data_dev_ptr,
 										  Eigen::Matrix<double, -1, 1, 0, 3, 1> *da_dev_ptr,
 										  Eigen::Matrix<double, -1, -1, 0, 3, 3> *grad_dev_ptr,
 										  int n_bases,
@@ -67,9 +67,9 @@ namespace polyfem::assembler
 
 		int compute_energy_gpu(double *displacement_dev_ptr,
 							   Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, 0, 3, 3> *jac_it_dev_ptr,
-							   basis::Local2Global *global_data_dev_ptr,
+							   basis::Local2Global_GPU *global_data_dev_ptr,
 							   Eigen::Matrix<double, -1, 1, 0, 3, 1> *da_dev_ptr,
-							   Eigen::Matrix<double, -1, 1, 0, 3, 1> *grad_dev_ptr,
+							   Eigen::Matrix<double, -1, -1, 0, 3, 3> *grad_dev_ptr,
 							   int n_bases,
 							   int n_loc_bases,
 							   int global_columns_N,

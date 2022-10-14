@@ -10,6 +10,8 @@
 
 #include <finitediff.hpp>
 
+#include <polyfem/utils/CUDA_utilities.cuh>
+
 #include <polyfem/State.hpp>
 
 #include <catch2/catch.hpp>
@@ -64,13 +66,14 @@ namespace
 		auto state = std::make_shared<State>(1);
 		state->init_logger("", spdlog::level::warn, false);
 		state->init(in_args, true);
-
 		state->load_mesh();
 
 		state->build_basis();
 		state->assemble_rhs();
 		state->assemble_stiffness_mat();
 
+		DATA_POINTERS_GPU data_gpu;
+		state->data_gpu_ = data_gpu;
 		return state;
 	}
 } // namespace
@@ -192,7 +195,7 @@ TEST_CASE("elastic form derivatives", "[form][form_derivatives][elastic_form]")
 		state_ptr->ass_vals_cache,
 		state_ptr->formulation(),
 		state_ptr->args["time"]["dt"],
-		state_ptr->mesh->is_volume());
+		state_ptr->mesh->is_volume(), state_ptr->data_gpu_);
 	test_form(form, *state_ptr);
 }
 
@@ -240,7 +243,7 @@ TEST_CASE("damping form derivatives", "[form][form_derivatives][damping_form]")
 		state_ptr->ass_vals_cache,
 		"Damping",
 		dt,
-		state_ptr->mesh->is_volume());
+		state_ptr->mesh->is_volume(), state_ptr->data_gpu_);
 	form.update_quantities(0, Eigen::VectorXd::Ones(state_ptr->n_bases * 2));
 	test_form(form, *state_ptr);
 }

@@ -90,6 +90,42 @@ void COPYDATATOHOST(T *A, T *d_A, int _size)
 	}
 }
 
+namespace polyfem
+{
+	class DATA_POINTERS_GPU
+	{
+	public:
+		DATA_POINTERS_GPU()
+		{
+			n_elements = 0;
+			jac_it_size = 0;
+			n_loc_bases = 0;
+			global_vector_size = 0;
+			n_pts = 0;
+
+			jac_it_dev_ptr = nullptr;
+			global_data_dev_ptr = nullptr;
+			da_dev_ptr = nullptr;
+			grad_dev_ptr = nullptr;
+			mu_ptr = nullptr;
+			lambda_ptr = nullptr;
+		}
+
+		int n_elements;
+		int jac_it_size;
+		int n_loc_bases;
+		int global_vector_size;
+		int n_pts;
+
+		Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, 0, 3, 3> *jac_it_dev_ptr;
+		basis::Local2Global_GPU *global_data_dev_ptr;
+		Eigen::Matrix<double, -1, 1, 0, 3, 1> *da_dev_ptr;
+		Eigen::Matrix<double, -1, -1, 0, 3, 3> *grad_dev_ptr;
+		double *mu_ptr;
+		double *lambda_ptr;
+	};
+} // namespace polyfem
+
 template <typename T>
 __device__ void DYNAMIC_GPU_ALLOC(T *A, int _size)
 {

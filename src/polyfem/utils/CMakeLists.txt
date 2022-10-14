@@ -6,6 +6,7 @@ set(SOURCES
 	Bessel.hpp
 	BoundarySampler.cpp
 	BoundarySampler.hpp
+	CUDA_utilities.cuh
 	Selection.cpp
 	Selection.hpp
 	DisableWarnings.hpp

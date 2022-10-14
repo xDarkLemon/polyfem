@@ -2,8 +2,7 @@
 #include <polyfem/basis/Basis.hpp>
 #include <polyfem/autogen/auto_elasticity_rhs.hpp>
 
-#include "CUDA_utilities.cuh"
-#include "cublas_v2.h"
+#include <polyfem/utils/CUDA_utilities.cuh>
 
 #include <polyfem/utils/MatrixUtils.hpp>
 #include <igl/Timer.h>
@@ -121,9 +120,9 @@ namespace polyfem
 		template <typename T>
 		__global__ void compute_energy_gpu_aux(double *displacement,
 											   Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, 0, 3, 3> *jac_it_array,
-											   Local2Global *global_data,
+											   Local2Global_GPU *global_data,
 											   Eigen::Matrix<double, -1, 1, 0, 3, 1> *da,
-											   Eigen::Matrix<double, -1, 1, 0, 3, 1> *grad,
+											   Eigen::Matrix<double, -1, -1, 0, 3, 3> *grad,
 											   int n_bases,
 											   int n_loc_bases,
 											   int global_vector_size,
@@ -183,20 +182,11 @@ namespace polyfem
 					double _det;
 					kernel_det(def_grad, _det);
 					const T log_det_j = log(_det);
-					const T val = mu[p] / 2 * ((def_grad.transpose() * def_grad).trace() - _size - 2 * log_det_j) + lambda[p] / 2 * log_det_j * log_det_j;
-
+					const T val = mu[b_index * n_pts + p] / 2 * ((def_grad.transpose() * def_grad).trace() - _size - 2 * log_det_j) + lambda[b_index * n_pts + p] / 2 * log_det_j * log_det_j;
 					energy += val * da[b_index](p);
 				}
 
-				typedef cub::BlockReduce<double, 32> BlockReduce;
-				// Allocate shared memory for BlockReduce
-				__shared__ typename BlockReduce::TempStorage temp_storage;
-
-				double result_ = BlockReduce(temp_storage).Sum(energy);
-				if (tx == 0)
-				{
-					atomicAdd(&energy_val[0], result_);
-				}
+				atomicAdd(&energy_val[0], energy);
 			}
 		}
 
@@ -204,7 +194,7 @@ namespace polyfem
 		__global__ void compute_energy_aux_gradient_fast_GPU(int n_basis_global,
 															 double *displacement,
 															 Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, 0, 3, 3> *jac_it_array,
-															 Local2Global *global_data,
+															 Local2Global_GPU *global_data,
 															 Eigen::Matrix<double, -1, 1, 0, 3, 1> *da,
 															 Eigen::Matrix<double, -1, -1, 0, 3, 3> *grad_v,
 															 int n_bases,
@@ -216,11 +206,6 @@ namespace polyfem
 															 double *mu,
 															 double *result_vec)
 		{
-			Eigen::Matrix<double, -1, -1> vec(n_basis_global * size_, 1);
-			vec.setZero();
-
-			extern __shared__ double shared_vec[];
-
 			int bx = blockIdx.x;
 			int tx = threadIdx.x;
 			int b_index = bx * NUMBER_THREADS + tx;
@@ -250,7 +235,7 @@ namespace polyfem
 					Eigen::Matrix<double, n_basis, dim> grad(n_loc_bases, size_);
 					for (size_t i = 0; i < n_loc_bases; ++i)
 					{
-						grad.row(i) = grad_v[b_index * n_loc_bases * n_pts + i * n_pts].row(p);
+						grad.row(i) = grad_v[b_index * n_loc_bases * n_pts + i * n_pts].col(p);
 					}
 					Eigen::Matrix<double, dim, dim> jac_it;
 					for (long k = 0; k < jac_it.size(); ++k)
@@ -293,10 +278,10 @@ namespace polyfem
 
 					Eigen::Matrix<double, n_basis, dim> delF_delU = grad * jac_it;
 
-					Eigen::Matrix<double, dim, dim> gradient_temp = mu[p] * def_grad - mu[p] * (1 / J) * delJ_delF + lambda[p] * log_det_j * (1 / J) * delJ_delF;
+					Eigen::Matrix<double, dim, dim> gradient_temp = mu[b_index * n_pts + p] * def_grad - mu[b_index * n_pts + p] * (1 / J) * delJ_delF + lambda[b_index * n_pts + p] * log_det_j * (1 / J) * delJ_delF;
 					Eigen::Matrix<double, n_basis, dim> gradient = delF_delU * gradient_temp.transpose();
 
-					double val = mu[p] / 2 * ((def_grad.transpose() * def_grad).trace() - size_ - 2 * log_det_j) + lambda[p] / 2 * log_det_j * log_det_j;
+					double val = mu[b_index * n_pts + p] / 2 * ((def_grad.transpose() * def_grad).trace() - size_ - 2 * log_det_j) + lambda[b_index * n_pts + p] / 2 * log_det_j * log_det_j;
 
 					G.noalias() += gradient * da[b_index](p);
 				}
@@ -320,33 +305,10 @@ namespace polyfem
 						{
 							const auto gj = global_data[b_index * n_loc_bases * global_vector_size + j * global_vector_size + jj].index * size_ + m;
 							const auto wj = global_data[b_index * n_loc_bases * global_vector_size + j * global_vector_size + jj].val;
-
-							vec(gj) += local_value * wj;
+							atomicAdd(&result_vec[gj], local_value * wj);
 						}
 					}
 				}
-
-				typedef cub::BlockReduce<double, 32> BlockReduce;
-				// Allocate shared memory for BlockReduce
-				__shared__ typename BlockReduce::TempStorage temp_storage;
-
-				for (int i = 0; i < n_basis_global * size_; i++)
-				{
-					double result_ = BlockReduce(temp_storage).Sum(vec(i));
-					if (tx == 0)
-					{
-						shared_vec[i] = result_;
-						atomicAdd(&result_vec[i], shared_vec[i]);
-					}
-				}
-
-				//				for (int i = 0; i < N_basis_global * size_; i++)
-				//				{
-				//					if (tx == 0)
-				//					{
-				//						//	atomicAdd(&result_vec[i], shared_vec[i]);
-				//					}
-				//				}
 			}
 		}
 
@@ -403,7 +365,7 @@ namespace polyfem
 					Eigen::Matrix<double, n_basis, dim> grad(n_loc_bases, size_);
 					for (size_t i = 0; i < n_loc_bases; ++i)
 					{
-						//grad.row(i) = grad_v[b_index * n_loc_bases * n_pts + i * n_pts].row(p); //ORIGINAL
+						// grad.row(i) = grad_v[b_index * n_loc_bases * n_pts + i * n_pts].row(p); //ORIGINAL
 						grad.row(i) = grad_v[b_index * n_loc_bases * n_pts + i * n_pts].col(p);
 					}
 					Eigen::Matrix<double, dim, dim> jac_it;
@@ -520,9 +482,9 @@ namespace polyfem
 
 		int NeoHookeanElasticity::compute_energy_gpu(double *displacement_dev_ptr,
 													 Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, 0, 3, 3> *jac_it_dev_ptr,
-													 Local2Global *global_data_dev_ptr,
+													 Local2Global_GPU *global_data_dev_ptr,
 													 Eigen::Matrix<double, -1, 1, 0, 3, 1> *da_dev_ptr,
-													 Eigen::Matrix<double, -1, 1, 0, 3, 1> *grad_dev_ptr,
+													 Eigen::Matrix<double, -1, -1, 0, 3, 3> *grad_dev_ptr,
 													 int n_bases,
 													 int n_loc_bases,
 													 int global_vector_size,
@@ -539,7 +501,8 @@ namespace polyfem
 
 			compute_energy_gpu_aux<double><<<grid, threads>>>(displacement_dev_ptr, jac_it_dev_ptr, global_data_dev_ptr, da_dev_ptr, grad_dev_ptr, n_bases, n_loc_bases, global_vector_size, n_pts, size(), lambda, mu, energy_ptr);
 
-			cudaDeviceSynchronize();
+			gpuErrchk(cudaPeekAtLastError());
+			CHECK_CUDA_ERROR(cudaDeviceSynchronize());
 			thrust::host_vector<double> energy(energy_dev.begin(), energy_dev.end());
 			return energy[0];
 		}
@@ -547,7 +510,7 @@ namespace polyfem
 		Eigen::VectorXd
 		NeoHookeanElasticity::assemble_grad_GPU(double *displacement_dev_ptr,
 												Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, 0, 3, 3> *jac_it_dev_ptr,
-												Local2Global *global_data_dev_ptr,
+												Local2Global_GPU *global_data_dev_ptr,
 												Eigen::Matrix<double, -1, 1, 0, 3, 1> *da_dev_ptr,
 												Eigen::Matrix<double, -1, -1, 0, 3, 3> *grad_dev_ptr,
 												int n_bases,
@@ -567,19 +530,19 @@ namespace polyfem
 			{
 				if (n_loc_bases == 3)
 				{
-					compute_energy_aux_gradient_fast_GPU<3, 2><<<grid, threads, n_basis * size() * sizeof(double)>>>(n_basis, displacement_dev_ptr, jac_it_dev_ptr, global_data_dev_ptr, da_dev_ptr, grad_dev_ptr, n_bases, n_loc_bases, global_vector_size, n_pts, size(), lambda, mu, vec_ptr);
+					compute_energy_aux_gradient_fast_GPU<3, 2><<<grid, threads>>>(n_basis, displacement_dev_ptr, jac_it_dev_ptr, global_data_dev_ptr, da_dev_ptr, grad_dev_ptr, n_bases, n_loc_bases, global_vector_size, n_pts, size(), lambda, mu, vec_ptr);
 				}
 				else if (n_loc_bases == 6)
 				{
-					compute_energy_aux_gradient_fast_GPU<6, 2><<<grid, threads, n_basis * size() * sizeof(double)>>>(n_basis, displacement_dev_ptr, jac_it_dev_ptr, global_data_dev_ptr, da_dev_ptr, grad_dev_ptr, n_bases, n_loc_bases, global_vector_size, n_pts, size(), lambda, mu, vec_ptr);
+					compute_energy_aux_gradient_fast_GPU<6, 2><<<grid, threads>>>(n_basis, displacement_dev_ptr, jac_it_dev_ptr, global_data_dev_ptr, da_dev_ptr, grad_dev_ptr, n_bases, n_loc_bases, global_vector_size, n_pts, size(), lambda, mu, vec_ptr);
 				}
 				else if (n_loc_bases == 10)
 				{
-					compute_energy_aux_gradient_fast_GPU<10, 2><<<grid, threads, n_basis * size() * sizeof(double)>>>(n_basis, displacement_dev_ptr, jac_it_dev_ptr, global_data_dev_ptr, da_dev_ptr, grad_dev_ptr, n_bases, n_loc_bases, global_vector_size, n_pts, size(), lambda, mu, vec_ptr);
+					compute_energy_aux_gradient_fast_GPU<10, 2><<<grid, threads>>>(n_basis, displacement_dev_ptr, jac_it_dev_ptr, global_data_dev_ptr, da_dev_ptr, grad_dev_ptr, n_bases, n_loc_bases, global_vector_size, n_pts, size(), lambda, mu, vec_ptr);
 				}
 				else
 				{
-					compute_energy_aux_gradient_fast_GPU<Eigen::Dynamic, 2><<<grid, threads, n_basis * size() * sizeof(double)>>>(n_basis, displacement_dev_ptr, jac_it_dev_ptr, global_data_dev_ptr, da_dev_ptr, grad_dev_ptr, n_bases, n_loc_bases, global_vector_size, n_pts, size(), lambda, mu, vec_ptr);
+					compute_energy_aux_gradient_fast_GPU<Eigen::Dynamic, 2><<<grid, threads>>>(n_basis, displacement_dev_ptr, jac_it_dev_ptr, global_data_dev_ptr, da_dev_ptr, grad_dev_ptr, n_bases, n_loc_bases, global_vector_size, n_pts, size(), lambda, mu, vec_ptr);
 				}
 			}
 			else // if (size() == 3)
@@ -587,22 +550,23 @@ namespace polyfem
 				assert(size() == 3);
 				if (n_loc_bases == 4)
 				{
-					compute_energy_aux_gradient_fast_GPU<4, 3><<<grid, threads, n_basis * size() * sizeof(double)>>>(n_basis, displacement_dev_ptr, jac_it_dev_ptr, global_data_dev_ptr, da_dev_ptr, grad_dev_ptr, n_bases, n_loc_bases, global_vector_size, n_pts, size(), lambda, mu, vec_ptr);
+					compute_energy_aux_gradient_fast_GPU<4, 3><<<grid, threads>>>(n_basis, displacement_dev_ptr, jac_it_dev_ptr, global_data_dev_ptr, da_dev_ptr, grad_dev_ptr, n_bases, n_loc_bases, global_vector_size, n_pts, size(), lambda, mu, vec_ptr);
 				}
 				else if (n_loc_bases == 10)
 				{
-					compute_energy_aux_gradient_fast_GPU<10, 3><<<grid, threads, n_basis * size() * sizeof(double)>>>(n_basis, displacement_dev_ptr, jac_it_dev_ptr, global_data_dev_ptr, da_dev_ptr, grad_dev_ptr, n_bases, n_loc_bases, global_vector_size, n_pts, size(), lambda, mu, vec_ptr);
+					compute_energy_aux_gradient_fast_GPU<10, 3><<<grid, threads>>>(n_basis, displacement_dev_ptr, jac_it_dev_ptr, global_data_dev_ptr, da_dev_ptr, grad_dev_ptr, n_bases, n_loc_bases, global_vector_size, n_pts, size(), lambda, mu, vec_ptr);
 				}
 				else if (n_loc_bases == 20)
 				{
-					compute_energy_aux_gradient_fast_GPU<20, 3><<<grid, threads, n_basis * size() * sizeof(double)>>>(n_basis, displacement_dev_ptr, jac_it_dev_ptr, global_data_dev_ptr, da_dev_ptr, grad_dev_ptr, n_bases, n_loc_bases, global_vector_size, n_pts, size(), lambda, mu, vec_ptr);
+					compute_energy_aux_gradient_fast_GPU<20, 3><<<grid, threads>>>(n_basis, displacement_dev_ptr, jac_it_dev_ptr, global_data_dev_ptr, da_dev_ptr, grad_dev_ptr, n_bases, n_loc_bases, global_vector_size, n_pts, size(), lambda, mu, vec_ptr);
 				}
 				else
 				{
-					compute_energy_aux_gradient_fast_GPU<Eigen::Dynamic, 3><<<grid, threads, n_basis * size() * sizeof(double)>>>(n_basis, displacement_dev_ptr, jac_it_dev_ptr, global_data_dev_ptr, da_dev_ptr, grad_dev_ptr, n_bases, n_loc_bases, global_vector_size, n_pts, size(), lambda, mu, vec_ptr);
+					compute_energy_aux_gradient_fast_GPU<Eigen::Dynamic, 3><<<grid, threads>>>(n_basis, displacement_dev_ptr, jac_it_dev_ptr, global_data_dev_ptr, da_dev_ptr, grad_dev_ptr, n_bases, n_loc_bases, global_vector_size, n_pts, size(), lambda, mu, vec_ptr);
 				}
 			}
-			cudaDeviceSynchronize();
+			gpuErrchk(cudaPeekAtLastError());
+			CHECK_CUDA_ERROR(cudaDeviceSynchronize());
 			thrust::host_vector<double> vec_stg(vec_dev.begin(), vec_dev.end());
 			Eigen::Matrix<double, -1, 1> vec(Eigen::Map<Eigen::Matrix<double, -1, 1>>(vec_stg.data(), vec_stg.size()));
 			return vec;
@@ -776,9 +740,6 @@ namespace polyfem
 				gpuErrchk(cudaPeekAtLastError());
 				CHECK_CUDA_ERROR(cudaDeviceSynchronize());
 			}
-			// CHECK_LAST_CUDA_ERROR();
-
-			// gpuErrchk(cudaDeviceSynchronize());
 			thrust::copy(computed_values_dev.begin(), computed_values_dev.end(), computed_values.begin());
 
 			return computed_values;

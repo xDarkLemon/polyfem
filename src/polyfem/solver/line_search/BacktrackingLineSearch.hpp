@@ -3,7 +3,7 @@
 #include "LineSearch.hpp"
 
 #include <polyfem/utils/Timer.hpp>
-
+#include <igl/Timer.h>
 #include <cfenv>
 
 namespace polyfem
@@ -148,6 +148,8 @@ namespace polyfem
 					const double old_energy_in,
 					const double starting_step_size = 1)
 				{
+
+					igl::Timer timerg;
 					double step_size = starting_step_size;
 
 					TVector grad(x.rows());
@@ -170,6 +172,7 @@ namespace polyfem
 							objFunc.solution_changed(new_x);
 						}
 
+						timerg.start();
 						if (use_grad_norm)
 						{
 							objFunc.gradient(new_x, grad);
@@ -178,7 +181,13 @@ namespace polyfem
 						else
 							cur_energy = objFunc.value(new_x);
 
+						timerg.stop();
+						logger().trace("done obj.value/grad for LS {}s...", timerg.getElapsedTime());
+
+						timerg.start();
 						is_step_valid = objFunc.is_step_valid(x, new_x);
+						timerg.stop();
+						logger().trace("done is_step_valid for LS {}s...", timerg.getElapsedTime());
 
 						logger().trace("ls it: {} delta: {} invalid: {} ", this->cur_iter, (cur_energy - old_energy), !is_step_valid);
 

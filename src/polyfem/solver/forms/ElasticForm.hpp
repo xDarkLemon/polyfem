@@ -8,6 +8,7 @@
 
 #include <polyfem/utils/Types.hpp>
 
+#include <polyfem/utils/CUDA_utilities.cuh>
 namespace polyfem::solver
 {
 	/// @brief Form of the elasticity potential and forces
@@ -23,7 +24,8 @@ namespace polyfem::solver
 					const assembler::AssemblyValsCache &ass_vals_cache,
 					const std::string &formulation,
 					const double dt,
-					const bool is_volume);
+					const bool is_volume,
+					DATA_POINTERS_GPU &data_gpu);
 
 	protected:
 		/// @brief Compute the elastic potential value
@@ -52,6 +54,7 @@ namespace polyfem::solver
 		/// @param t Current time
 		/// @param x Current solution at time t
 		void update_quantities(const double t, const Eigen::VectorXd &x) override { x_prev_ = x; }
+
 	private:
 		const int n_bases_;
 		const std::vector<basis::ElementBases> &bases_;
@@ -65,8 +68,10 @@ namespace polyfem::solver
 		StiffnessMatrix cached_stiffness_;  ///< Cached stiffness matrix for linear elasticity
 		utils::SpareMatrixCache mat_cache_; ///< Matrix cache
 
+		const DATA_POINTERS_GPU &data_gpu_;
 		/// @brief Compute the stiffness matrix (cached)
-		void compute_cached_stiffness();
+		void
+		compute_cached_stiffness();
 
 		Eigen::VectorXd x_prev_;
 	};

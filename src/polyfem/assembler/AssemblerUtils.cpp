@@ -221,21 +221,9 @@ namespace polyfem
 											   const Eigen::MatrixXd &displacement_prev) const
 		{
 			if (assembler == "SaintVenant")
-
 				return saint_venant_elasticity_.assemble(is_volume, bases, gbases, cache, dt, displacement, displacement_prev);
-#ifdef USE_GPU
 			else if (assembler == "NeoHookean")
-			{
 				return neo_hookean_elasticity_.assemble(is_volume, bases, gbases, cache, dt, displacement, displacement_prev);
-				//	return neo_hookean_elasticity_.assemble_GPU(is_volume, bases, gbases, cache, displacement);
-			}
-#endif
-#ifndef USE_GPU
-			else if (assembler == "NeoHookean")
-			{
-				return neo_hookean_elasticity_.assemble(is_volume, bases, gbases, cache, dt, displacement, displacement_prev);
-			}
-#endif
 			else if (assembler == "MultiModels")
 				return multi_models_elasticity_.assemble(is_volume, bases, gbases, cache, dt, displacement, displacement_prev);
 			else if (assembler == "Damping")
@@ -249,6 +237,21 @@ namespace polyfem
 				return 0;
 		}
 
+		double AssemblerUtils::assemble_energy_GPU(const std::string &assembler,
+												   const bool is_volume,
+												   const std::vector<ElementBases> &bases,
+												   const std::vector<ElementBases> &gbases,
+												   const AssemblyValsCache &cache,
+												   const double dt,
+												   const Eigen::MatrixXd &displacement,
+												   const Eigen::MatrixXd &displacement_prev,
+												   const DATA_POINTERS_GPU &data_gpu) const
+		{
+			if (assembler == "NeoHookean")
+				return neo_hookean_elasticity_.assemble_GPU(data_gpu, displacement);
+			else
+				return 0;
+		}
 		void AssemblerUtils::assemble_energy_gradient(const std::string &assembler,
 													  const bool is_volume,
 													  const int n_basis,
@@ -262,17 +265,8 @@ namespace polyfem
 		{
 			if (assembler == "SaintVenant")
 				saint_venant_elasticity_.assemble_grad(is_volume, n_basis, bases, gbases, cache, dt, displacement, displacement_prev, grad);
-#ifdef USE_GPU
 			else if (assembler == "NeoHookean")
 				neo_hookean_elasticity_.assemble_grad(is_volume, n_basis, bases, gbases, cache, dt, displacement, displacement_prev, grad);
-				// neo_hookean_elasticity_.assemble_grad_GPU(is_volume, n_basis, bases, gbases, cache, displacement, grad);
-#endif
-#ifndef USE_GPU
-			else if (assembler == "NeoHookean")
-			{
-				neo_hookean_elasticity_.assemble_grad(is_volume, n_basis, bases, gbases, cache, dt, displacement, displacement_prev, grad);
-			}
-#endif
 			else if (assembler == "MultiModels")
 				multi_models_elasticity_.assemble_grad(is_volume, n_basis, bases, gbases, cache, dt, displacement, displacement_prev, grad);
 			else if (assembler == "Damping")
@@ -283,6 +277,24 @@ namespace polyfem
 				linear_elasticity_energy_.assemble_grad(is_volume, n_basis, bases, gbases, cache, dt, displacement, displacement_prev, grad);
 			// else if(assembler == "Ogden")
 			//	ogden_elasticity_.assemble_grad(is_volume, n_basis, bases, gbases, cache, dt, displacement, displacement_prev, grad);
+			else
+				return;
+		}
+		void AssemblerUtils::assemble_energy_gradient_GPU(const std::string &assembler,
+														  const bool is_volume,
+														  const int n_basis,
+														  const std::vector<ElementBases> &bases,
+														  const std::vector<ElementBases> &gbases,
+														  const AssemblyValsCache &cache,
+														  const double dt,
+														  const Eigen::MatrixXd &displacement,
+														  const Eigen::MatrixXd &displacement_prev,
+														  Eigen::MatrixXd &grad,
+														  const DATA_POINTERS_GPU &data_gpu) const
+		{
+
+			if (assembler == "NeoHookean")
+				neo_hookean_elasticity_.assemble_grad_GPU(data_gpu, n_basis, displacement, grad);
 			else
 				return;
 		}
@@ -300,11 +312,44 @@ namespace polyfem
 													 utils::SpareMatrixCache &mat_cache,
 													 StiffnessMatrix &hessian) const
 		{
-			igl::Timer timerg;
 			if (assembler == "SaintVenant")
 				saint_venant_elasticity_.assemble_hessian(is_volume, n_basis, project_to_psd, bases, gbases, cache, dt, displacement, displacement_prev, mat_cache, hessian);
-#ifdef USE_GPU
 			else if (assembler == "NeoHookean")
+				neo_hookean_elasticity_.assemble_hessian(is_volume, n_basis, project_to_psd, bases, gbases, cache, dt, displacement, displacement_prev, mat_cache, hessian);
+			else if (assembler == "MultiModels")
+				multi_models_elasticity_.assemble_hessian(is_volume, n_basis, project_to_psd, bases, gbases, cache, dt, displacement, displacement_prev, mat_cache, hessian);
+			else if (assembler == "Damping")
+				damping_.assemble_hessian(is_volume, n_basis, project_to_psd, bases, gbases, cache, dt, displacement, displacement_prev, mat_cache, hessian);
+			else if (assembler == "NavierStokesPicard")
+				navier_stokes_velocity_picard_.assemble_hessian(is_volume, n_basis, project_to_psd, bases, gbases, cache, dt, displacement, displacement_prev, mat_cache, hessian);
+			else if (assembler == "NavierStokes")
+				navier_stokes_velocity_.assemble_hessian(is_volume, n_basis, project_to_psd, bases, gbases, cache, dt, displacement, displacement_prev, mat_cache, hessian);
+			else if (assembler == "LinearElasticity")
+				linear_elasticity_energy_.assemble_hessian(is_volume, n_basis, project_to_psd, bases, gbases, cache, dt, displacement, displacement_prev, mat_cache, hessian);
+
+			// else if(assembler == "Ogden")
+			//	ogden_elasticity_.assemble_hessian(is_volume, n_basis, project_to_psd, bases, gbases, cache, dt, displacement, displacement_prev, mat_cache, hessian);
+			else
+				return;
+		}
+
+		void AssemblerUtils::assemble_energy_hessian_GPU(const std::string &assembler,
+														 const bool is_volume,
+														 const int n_basis,
+														 const bool project_to_psd,
+														 const std::vector<ElementBases> &bases,
+														 const std::vector<ElementBases> &gbases,
+														 const AssemblyValsCache &cache,
+														 const double dt,
+														 const Eigen::MatrixXd &displacement,
+														 const Eigen::MatrixXd &displacement_prev,
+														 utils::SpareMatrixCache &mat_cache,
+														 StiffnessMatrix &hessian,
+														 const DATA_POINTERS_GPU &data_gpu) const
+		{
+			igl::Timer timerg;
+
+			if (assembler == "NeoHookean")
 			{
 				static mapping_pair **mapping_gpu_dev = nullptr;
 				static int flag_gpu_settings = 0;
@@ -366,26 +411,8 @@ namespace polyfem
 					logger().trace("done mapping and transfer calculation to GPU {}s...", timerg.getElapsedTime());
 					return;
 				}
-				neo_hookean_elasticity_.assemble_hessian_GPU(is_volume, n_basis, project_to_psd, bases, gbases, cache, displacement, mat_cache, hessian, mapping_gpu_dev);
+				neo_hookean_elasticity_.assemble_hessian_GPU(data_gpu, n_basis, displacement, mat_cache, hessian, mapping_gpu_dev);
 			}
-#endif
-#ifndef USE_GPU
-			else if (assembler == "NeoHookean")
-				neo_hookean_elasticity_.assemble_hessian(is_volume, n_basis, project_to_psd, bases, gbases, cache, dt, displacement, displacement_prev, mat_cache, hessian);
-#endif
-			else if (assembler == "MultiModels")
-				multi_models_elasticity_.assemble_hessian(is_volume, n_basis, project_to_psd, bases, gbases, cache, dt, displacement, displacement_prev, mat_cache, hessian);
-			else if (assembler == "Damping")
-				damping_.assemble_hessian(is_volume, n_basis, project_to_psd, bases, gbases, cache, dt, displacement, displacement_prev, mat_cache, hessian);
-			else if (assembler == "NavierStokesPicard")
-				navier_stokes_velocity_picard_.assemble_hessian(is_volume, n_basis, project_to_psd, bases, gbases, cache, dt, displacement, displacement_prev, mat_cache, hessian);
-			else if (assembler == "NavierStokes")
-				navier_stokes_velocity_.assemble_hessian(is_volume, n_basis, project_to_psd, bases, gbases, cache, dt, displacement, displacement_prev, mat_cache, hessian);
-			else if (assembler == "LinearElasticity")
-				linear_elasticity_energy_.assemble_hessian(is_volume, n_basis, project_to_psd, bases, gbases, cache, dt, displacement, displacement_prev, mat_cache, hessian);
-
-			// else if(assembler == "Ogden")
-			//	ogden_elasticity_.assemble_hessian(is_volume, n_basis, project_to_psd, bases, gbases, cache, dt, displacement, displacement_prev, mat_cache, hessian);
 			else
 				return;
 		}

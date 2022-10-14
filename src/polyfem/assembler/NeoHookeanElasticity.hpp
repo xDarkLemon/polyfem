@@ -5,6 +5,14 @@
 #include <polyfem/Common.hpp>
 #include <polyfem/utils/ElasticityUtils.hpp>
 
+#include <thrust/functional.h>
+#include <thrust/reduce.h>
+#include <thrust/device_vector.h>
+#include <thrust/copy.h>
+#include <thrust/host_vector.h>
+#include <polyfem/utils/CUDA_utilities.cuh>
+
+#include <polyfem/assembler/ElementAssemblyValues.hpp>
 #include <polyfem/basis/ElementBases.hpp>
 
 #include <polyfem/utils/AutodiffTypes.hpp>
@@ -25,9 +33,6 @@ namespace polyfem::assembler
 		Eigen::MatrixXd assemble_hessian(const NonLinearAssemblerData &data) const;
 		Eigen::VectorXd assemble_grad(const NonLinearAssemblerData &data) const;
 
-		double compute_energy(const NonLinearAssemblerData &data) const;
-
-		// energy, gradient, and hessian used in newton method for GPU version
 		std::vector<double> assemble_hessian_GPU(double *displacement_dev_ptr,
 												 Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, 0, 3, 3> *jac_it_dev_ptr,
 												 basis::Local2Global_GPU *global_data_dev_ptr,
@@ -41,10 +46,12 @@ namespace polyfem::assembler
 												 double *mu_ptr,
 												 int non_zeros,
 												 mapping_pair **mapping) const;
+		// std::vector<double> &computed_values) const;
 
+		//			template <typename T>
 		Eigen::VectorXd assemble_grad_GPU(double *displacement_dev_ptr,
 										  Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, 0, 3, 3> *jac_it_dev_ptr,
-										  basis::Local2Global *global_data_dev_ptr,
+										  basis::Local2Global_GPU *global_data_dev_ptr,
 										  Eigen::Matrix<double, -1, 1, 0, 3, 1> *da_dev_ptr,
 										  Eigen::Matrix<double, -1, -1, 0, 3, 3> *grad_dev_ptr,
 										  int n_bases,
@@ -53,19 +60,23 @@ namespace polyfem::assembler
 										  int n_pts,
 										  double *lambda_ptr,
 										  double *mu_ptr,
+										  //					   double *val_grad_ptr, int n_basis) const;
 										  int n_basis) const;
+
+		double compute_energy(const NonLinearAssemblerData &data) const;
 
 		int compute_energy_gpu(double *displacement_dev_ptr,
 							   Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, 0, 3, 3> *jac_it_dev_ptr,
-							   basis::Local2Global *global_data_dev_ptr,
+							   basis::Local2Global_GPU *global_data_dev_ptr,
 							   Eigen::Matrix<double, -1, 1, 0, 3, 1> *da_dev_ptr,
-							   Eigen::Matrix<double, -1, 1, 0, 3, 1> *grad_dev_ptr,
+							   Eigen::Matrix<double, -1, -1, 0, 3, 3> *grad_dev_ptr,
 							   int n_bases,
 							   int n_loc_bases,
-							   int global_vector_size,
+							   int global_columns_N,
 							   int n_pts,
-							   double *lambda,
-							   double *mu) const;
+							   double *lambda_ptr,
+							   double *mu_ptr) const;
+		//					   double *energy_storage) const;
 
 		// rhs for fabbricated solution, compute with automatic sympy code
 		Eigen::Matrix<double, Eigen::Dynamic, 1, 0, 3, 1>

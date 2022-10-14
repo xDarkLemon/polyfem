@@ -1,6 +1,6 @@
 #pragma once
 
-#include "CUDA_utilities.cuh"
+#include <polyfem/utils/CUDA_utilities.cuh>
 
 void CATCHCUDAERROR(void)
 {

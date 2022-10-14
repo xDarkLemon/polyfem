@@ -139,6 +139,12 @@ else()
     message(STATUS "NOT USING GPU")
 endif()
 
+set(USE_NONLINEAR_GPU ON)
+
+if(USE_NONLINEAR_GPU)
+    add_definitions(-DUSE_NONLINEAR_GPU)
+endif()
+
 # ###############################################################################
 
 # set(POLYFEM_SMALL_N 105 CACHE STRING "" FORCE)
@@ -422,3 +428,10 @@ set_target_properties(polyfem PROPERTIES CUDA_ARCHITECTURES "60;70;75;86")
 set_target_properties(PolyFEM_bin PROPERTIES CUDA_ARCHITECTURES "60;70;75;86")
 
 # endif()
+
+# ###############################################################################
+# gprof
+# ###############################################################################
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pg")
+set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -pg")
+set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -pg")

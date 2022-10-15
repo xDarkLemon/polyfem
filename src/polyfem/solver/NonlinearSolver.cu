@@ -122,10 +122,12 @@ namespace cppoptlib
                 POLYFEM_SCOPED_TIMER("compute gradient", grad_time);
                 objFunc.gradient(x, grad);
             }
+
+            // const double grad_norm = grad.norm();
 			thrust::copy(grad.begin(), grad.end(), grad_host.begin());
 			thrust::copy(grad_host.begin(), grad_host.end(), grad_dev.begin());
             const double grad_norm = std::sqrt(thrust::inner_product(grad_dev.begin(), grad_dev.end(), grad_dev.begin(), 0.0));
-            // const double grad_norm = grad.norm();
+
             if (std::isnan(grad_norm))
             {
                 this->m_status = Status::UserDefined;

@@ -401,3 +401,6 @@ set_target_properties(polyfem PROPERTIES CUDA_ARCHITECTURES "60;70;75;86")
 set_target_properties(PolyFEM_bin PROPERTIES CUDA_ARCHITECTURES "60;70;75;86")
 
 # endif()
+
+target_link_libraries(polyfem PUBLIC ${CUDA_cusparse_LIBRARY})
+target_link_libraries(PolyFEM_bin PUBLIC ${CUDA_cusparse_LIBRARY})

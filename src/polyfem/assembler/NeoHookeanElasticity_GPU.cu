@@ -164,7 +164,8 @@ namespace polyfem
 						{
 							for (int c = 0; c < _size; ++c)
 							{
-								def_grad(d, c) += grad[b_index * n_loc_bases * n_pts + i * n_pts + p](c) * local_dispv(i * _size + d);
+								double val_grad = grad[b_index * n_loc_bases * n_pts + i * n_pts + p](c);
+								def_grad(d, c) += val_grad * local_dispv(i * _size + d);
 							}
 						}
 					}
@@ -178,7 +179,7 @@ namespace polyfem
 						def_grad(d, d) += T(1);
 
 					double _det;
-					kernel_det(def_grad, _det);
+					kernel_det<Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, 0, 3, 3>>(def_grad, _det);
 					const T log_det_j = log(_det);
 					const T val = mu[b_index * n_pts + p] / 2 * ((def_grad.transpose() * def_grad).trace() - _size - 2 * log_det_j) + lambda[b_index * n_pts + p] / 2 * log_det_j * log_det_j;
 					energy += val * da[b_index](p);

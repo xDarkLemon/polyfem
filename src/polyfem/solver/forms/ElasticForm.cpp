@@ -31,9 +31,16 @@ namespace polyfem::solver
 
 	double ElasticForm::value_unweighted(const Eigen::VectorXd &x) const
 	{
+#ifdef USE_GPU
+		return assembler_.assemble_energy_GPU(
+			formulation_, is_volume_, bases_, geom_bases_,
+			ass_vals_cache_, dt_, x, x_prev_, data_gpu_);
+#endif
+#ifndef USE_GPU
 		return assembler_.assemble_energy(
 			formulation_, is_volume_, bases_, geom_bases_,
 			ass_vals_cache_, dt_, x, x_prev_);
+#endif
 	}
 
 	void ElasticForm::first_derivative_unweighted(const Eigen::VectorXd &x, Eigen::VectorXd &gradv) const

@@ -26,8 +26,11 @@ namespace polyfem
 			const Eigen::MatrixXd &displacement) const
 		{
 			double store_val = 0.0;
+
+			igl::Timer timerg;
 			thrust::device_vector<double> displacement_dev(displacement.col(0).begin(), displacement.col(0).end());
 			double *displacement_dev_ptr = thrust::raw_pointer_cast(displacement_dev.data());
+			timerg.start();
 			store_val = local_assembler_.compute_energy_gpu(displacement_dev_ptr,
 															data_gpu.jac_it_dev_ptr,
 															data_gpu.global_data_dev_ptr,
@@ -39,7 +42,8 @@ namespace polyfem
 															data_gpu.n_pts,
 															data_gpu.lambda_ptr,
 															data_gpu.mu_ptr);
-
+			timerg.stop();
+			logger().trace("done assembly value using GPU {}s...", timerg.getElapsedTime());
 			return store_val;
 		}
 
@@ -56,8 +60,11 @@ namespace polyfem
 			Eigen::MatrixXd vec;
 			vec.resize(rhs.size(), 1);
 			vec.setZero();
+
+			igl::Timer timerg;
 			thrust::device_vector<double> displacement_dev(displacement.col(0).begin(), displacement.col(0).end());
 			double *displacement_dev_ptr = thrust::raw_pointer_cast(displacement_dev.data());
+			timerg.start();
 			vec = local_assembler_.assemble_grad_GPU(displacement_dev_ptr,
 													 data_gpu.jac_it_dev_ptr,
 													 data_gpu.global_data_dev_ptr,
@@ -71,6 +78,8 @@ namespace polyfem
 													 data_gpu.mu_ptr,
 													 n_basis);
 			rhs += vec;
+			timerg.stop();
+			logger().trace("done assembly gradient using GPU {}s...", timerg.getElapsedTime());
 			return;
 		}
 
@@ -84,10 +93,11 @@ namespace polyfem
 			mapping_pair **mapping) const
 		{
 			// This is done after calling assemble_hessian to obtain mapping
-			igl::Timer timerg;
+
 			mat_cache.init(n_basis * local_assembler_.size());
 			mat_cache.set_zero();
 
+			igl::Timer timerg;
 			timerg.start();
 			// SENDING DISPLACEMENT TO GPU
 			thrust::device_vector<double> displacement_dev(displacement.col(0).begin(), displacement.col(0).end());
@@ -95,7 +105,7 @@ namespace polyfem
 			// SET UP MOVING VALUES FUNC (MAPPING ALREADY SENT TO GPU)
 			std::vector<double> computed_values(mat_cache.non_zeros(), 0);
 			timerg.stop();
-			logger().trace("done memory allocations for values and transfer displacement to GPU {}s...", timerg.getElapsedTime());
+			logger().trace("Transfer displacement for Hessian Assembly to GPU {}s...", timerg.getElapsedTime());
 
 			timerg.start();
 			computed_values = local_assembler_.assemble_hessian_GPU(displacement_dev_ptr,

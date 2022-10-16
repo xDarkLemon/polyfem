@@ -86,6 +86,7 @@ namespace cppoptlib
 		double grad_time;
 		double assembly_time;
 		double inverting_time;
+		double checking_direction_time;
 		double line_search_time;
 		double constraint_set_update_time;
 		double obj_fun_time;

@@ -443,6 +443,8 @@ namespace polyfem::assembler
 
 		const int n_bases = int(bases.size());
 
+		igl::Timer timerg;
+		timerg.start();
 		maybe_parallel_for(n_bases, [&](int start, int end, int thread_id) {
 			LocalThreadVecStorage &local_storage = get_local_thread_storage(storage, thread_id);
 
@@ -497,6 +499,8 @@ namespace polyfem::assembler
 		// Serially merge local storages
 		for (const LocalThreadVecStorage &local_storage : storage)
 			rhs += local_storage.vec;
+		timerg.stop();
+		logger().trace("done grad assembly MT {}s...", timerg.getElapsedTime());
 	}
 
 	template <class LocalAssembler>
@@ -644,6 +648,8 @@ namespace polyfem::assembler
 		auto storage = create_thread_storage(LocalThreadScalarStorage());
 		const int n_bases = int(bases.size());
 
+		igl::Timer timerg;
+		timerg.start();
 		maybe_parallel_for(n_bases, [&](int start, int end, int thread_id) {
 			LocalThreadScalarStorage &local_storage = get_local_thread_storage(storage, thread_id);
 			ElementAssemblyValues &vals = local_storage.vals;
@@ -666,6 +672,8 @@ namespace polyfem::assembler
 		// Serially merge local storages
 		for (const LocalThreadScalarStorage &local_storage : storage)
 			res += local_storage.val;
+		timerg.stop();
+		logger().trace("done value assembly MT {}s...", timerg.getElapsedTime());
 		return res;
 	}
 

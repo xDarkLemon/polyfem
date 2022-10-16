@@ -306,6 +306,7 @@ namespace cppoptlib
 		total_time = 0;
 		grad_time = 0;
 		assembly_time = 0;
+		checking_direction_time = 0;
 		inverting_time = 0;
 		line_search_time = 0;
 		obj_fun_time = 0;
@@ -337,6 +338,7 @@ namespace cppoptlib
 		solver_info["time_grad"] = grad_time / per_iteration;
 		solver_info["time_assembly"] = assembly_time / per_iteration;
 		solver_info["time_inverting"] = inverting_time / per_iteration;
+		solver_info["time_checking_direction"] = checking_direction_time / per_iteration;
 		solver_info["time_line_search"] = line_search_time / per_iteration;
 		solver_info["time_constraint_set_update"] = constraint_set_update_time / per_iteration;
 		solver_info["time_obj_fun"] = obj_fun_time / per_iteration;
@@ -364,12 +366,12 @@ namespace cppoptlib
 	void NonlinearSolver<ProblemType>::log_times()
 	{
 		polyfem::logger().debug(
-			"[timing] grad {:.3g}s, assembly {:.3g}s, inverting {:.3g}s, "
+			"[timing] grad {:.3g}s, assembly {:.3g}s, inverting {:.3g}s, checking_direction {:.3g}s, "
 			"line_search {:.3g}s, constraint_set_update {:.3g}s, "
 			"obj_fun {:.3g}s, checking_for_nan_inf {:.3g}s, "
 			"broad_phase_ccd {:.3g}s, ccd {:.3g}s, "
 			"classical_line_search {:.3g}s",
-			grad_time, assembly_time, inverting_time, line_search_time,
+			grad_time, assembly_time, inverting_time, checking_direction_time, line_search_time,
 			constraint_set_update_time + (m_line_search ? m_line_search->constraint_set_update_time : 0),
 			obj_fun_time, m_line_search ? m_line_search->checking_for_nan_inf_time : 0,
 			m_line_search ? m_line_search->broad_phase_ccd_time : 0, m_line_search ? m_line_search->ccd_time : 0,

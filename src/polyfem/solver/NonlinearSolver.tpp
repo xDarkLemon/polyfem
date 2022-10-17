@@ -40,6 +40,7 @@ namespace cppoptlib
 
 		reset(x.size()); // place for children to initialize their fields
 
+		using TVector = Eigen::Matrix<double, -1, 1>;
 		TVector grad = TVector::Zero(x.rows());
 		TVector delta_x = TVector::Zero(x.rows());
 

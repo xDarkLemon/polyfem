@@ -28,6 +28,7 @@ namespace cppoptlib
 		void assemble_hessian(ProblemType &objFunc, const TVector &x, polyfem::StiffnessMatrix &hessian);
 		bool solve_linear_system(const polyfem::StiffnessMatrix &hessian, const TVector &grad, TVector &direction);
 		bool check_direction(const polyfem::StiffnessMatrix &hessian, const TVector &grad, const TVector &direction);
+		bool check_direction_gpu(const polyfem::StiffnessMatrix &hessian, const Eigen::Matrix<double, -1, 1> &grad, const Eigen::Matrix<double, -1, 1> &direction);
 
 		static bool has_hessian_nans(const polyfem::StiffnessMatrix &hessian);
 
@@ -52,20 +53,20 @@ namespace cppoptlib
 		using Superclass::descent_strategy_name;
 		std::string descent_strategy_name(int descent_strategy) const override;
 
-		//		bool compute_update_direction_cuda(
-		//			ProblemType &objFunc,
-		//			const Eigen::Matrix<double, -1, 1> &x,
-		//			const Eigen::Matrix<double, -1, 1> &grad,
-		//			Eigen::Matrix<double, -1, 1> &direction);
-		//
-		//	virtual bool compute_update_direction_gpu(
-		//		ProblemType &objFunc,
-		//		const Eigen::Matrix<double, -1, 1> &x,
-		//		const Eigen::Matrix<double, -1, 1> &grad,
-		//		Eigen::Matrix<double, -1, 1> &direction) override
-		//	{
-		//		return compute_update_direction_cuda(objFunc, x, grad, direction);
-		//	}
+		// bool compute_update_direction_cuda(
+		// 	ProblemType &objFunc,
+		// 	const Eigen::Matrix<double, -1, 1> &x,
+		// 	const Eigen::Matrix<double, -1, 1> &grad,
+		// 	Eigen::Matrix<double, -1, 1> &direction);
+		
+		// virtual bool compute_update_direction_gpu(
+		// 		ProblemType &objFunc,
+		// 		const Eigen::Matrix<double, -1, 1> &x,
+		// 		const Eigen::Matrix<double, -1, 1> &grad,
+		// 		Eigen::Matrix<double, -1, 1> &direction) override
+		// 	{
+		// 		return compute_update_direction_cuda(objFunc, x, grad, direction);
+		// 	}
 
 		spdlog::level::level_enum log_level() const
 		{

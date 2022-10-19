@@ -6,7 +6,7 @@
 // #include <polyfem/utils/Timer.hpp>
 
 #include <polyfem/solver/NLProblem.hpp>
-#include <polyfem/solver/ALNLProblem.hpp>
+#include <polyfem/solver/FullNLProblem.hpp>
 #include <polyfem/solver/line_search/LineSearch.hpp>
 #include <polyfem/solver/line_search/BacktrackingLineSearch.hpp>
 
@@ -39,7 +39,6 @@ namespace polyfem
 				const double old_energy_in,
 				const double starting_step_size)
 			{
-				igl::Timer timerg;
 				double step_size = starting_step_size;
 
 				TVector grad(x.rows());
@@ -55,7 +54,7 @@ namespace polyfem
 				const double *x_host = x.data();
 				const double *delta_x_host = delta_x.data();
 				double *new_x_host = new double[N];
-				timerg.start();
+
 				grad_dev = ALLOCATE_GPU<double>(grad_dev, N * sizeof(double));
 				new_x_dev = ALLOCATE_GPU<double>(new_x_dev, N * sizeof(double));
 				x_dev = ALLOCATE_GPU<double>(x_dev, N * sizeof(double));
@@ -65,9 +64,6 @@ namespace polyfem
 				cudaMemset(new_x_dev, 0, N * sizeof(double));
 				COPYDATATOGPU<double>(x_dev, x_host, N * sizeof(double));
 				COPYDATATOGPU<double>(delta_x_dev, delta_x_host, N * sizeof(double));
-				cudaDeviceSynchronize();
-				timerg.stop();
-				logger().trace("time for COPY DATA TO GPU {}s...", timerg.getElapsedTime());
 
 				cublasHandle_t handle;
 				cublasCreate(&handle);
@@ -142,7 +138,7 @@ namespace polyfem
 				return step_size;
 			}
 			template class BacktrackingLineSearch<polyfem::solver::NLProblem>;
-			template class BacktrackingLineSearch<polyfem::solver::ALNLProblem>;
+			template class BacktrackingLineSearch<polyfem::solver::FullNLProblem>;
 		} // namespace line_search
 	}     // namespace solver
 } // namespace polyfem

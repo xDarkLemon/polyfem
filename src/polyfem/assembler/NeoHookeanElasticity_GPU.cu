@@ -117,7 +117,8 @@ namespace polyfem
 		}
 
 		// Compute ∫ ½μ (tr(FᵀF) - 3 - 2ln(J)) + ½λ ln²(J) du
-		template <typename T>
+
+		template <int n_basis, int dim>
 		__global__ void compute_energy_gpu_aux(double *displacement,
 											   Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, 0, 3, 3> *jac_it_array,
 											   Local2Global_GPU *global_data,
@@ -130,15 +131,16 @@ namespace polyfem
 											   int _size,
 											   double *lambda,
 											   double *mu,
-											   T *energy_val)
+											   double *energy_val)
 		{
 			int bx = blockIdx.x;
 			int tx = threadIdx.x;
 			int b_index = bx * NUMBER_THREADS + tx;
-
+			constexpr int N = (n_basis == Eigen::Dynamic) ? Eigen::Dynamic : n_basis * dim;
 			if (b_index < n_bases)
 			{
-				Eigen::Matrix<double, Eigen::Dynamic, 1> local_dispv(n_loc_bases * _size, 1);
+				Eigen::Matrix<double, N, 1> local_dispv(n_loc_bases * _size, 1);
+
 				local_dispv.setZero();
 				for (int i = 0; i < n_loc_bases; ++i)
 				{
@@ -152,13 +154,13 @@ namespace polyfem
 					}
 				}
 
-				T energy = T(0.0);
-				Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic, 0, 3, 3> def_grad(_size, _size);
+				double energy = double(0.0);
+				Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, 0, 3, 3> def_grad(_size, _size);
 
 				for (long p = 0; p < n_pts; ++p)
 				{
 					for (long k = 0; k < def_grad.size(); ++k)
-						def_grad(k) = T(0);
+						def_grad(k) = double(0);
 
 					for (size_t i = 0; i < n_loc_bases; ++i)
 					{
@@ -171,23 +173,24 @@ namespace polyfem
 							}
 						}
 					}
-					Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic, 0, 3, 3> jac_it(_size, _size);
+					Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, 0, 3, 3> jac_it(_size, _size);
 					for (long k = 0; k < jac_it.size(); ++k)
-						jac_it(k) = T(jac_it_array[b_index * n_pts + p](k));
+						jac_it(k) = double(jac_it_array[b_index * n_pts + p](k));
 					def_grad = def_grad * jac_it;
 
 					// Id + grad d
 					for (int d = 0; d < _size; ++d)
-						def_grad(d, d) += T(1);
+						def_grad(d, d) += double(1);
 
 					double _det;
 					kernel_det<Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, 0, 3, 3>>(def_grad, _det);
-					const T log_det_j = log(_det);
-					const T val = mu[b_index * n_pts + p] / 2 * ((def_grad.transpose() * def_grad).trace() - _size - 2 * log_det_j) + lambda[b_index * n_pts + p] / 2 * log_det_j * log_det_j;
+					const double log_det_j = log(_det);
+					const double val = mu[b_index * n_pts + p] / 2 * ((def_grad.transpose() * def_grad).trace() - _size - 2 * log_det_j) + lambda[b_index * n_pts + p] / 2 * log_det_j * log_det_j;
 					energy += val * da[b_index](p);
 				}
 
 				atomicAdd(&energy_val[0], energy);
+				__syncthreads();
 			}
 		}
 
@@ -310,6 +313,7 @@ namespace polyfem
 						}
 					}
 				}
+				__syncthreads();
 			}
 		}
 
@@ -478,29 +482,66 @@ namespace polyfem
 						}
 					}
 				}
+				__syncthreads();
 			}
 		}
 
-		int NeoHookeanElasticity::compute_energy_gpu(double *displacement_dev_ptr,
-													 Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, 0, 3, 3> *jac_it_dev_ptr,
-													 Local2Global_GPU *global_data_dev_ptr,
-													 Eigen::Matrix<double, -1, 1, 0, 3, 1> *da_dev_ptr,
-													 Eigen::Matrix<double, -1, -1, 0, 3, 3> *grad_dev_ptr,
-													 int n_bases,
-													 int n_loc_bases,
-													 int global_vector_size,
-													 int n_pts,
-													 double *lambda,
-													 double *mu) const
-		//													 double *energy_storage) const
+		double NeoHookeanElasticity::compute_energy_gpu(double *displacement_dev_ptr,
+														Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, 0, 3, 3> *jac_it_dev_ptr,
+														Local2Global_GPU *global_data_dev_ptr,
+														Eigen::Matrix<double, -1, 1, 0, 3, 1> *da_dev_ptr,
+														Eigen::Matrix<double, -1, -1, 0, 3, 3> *grad_dev_ptr,
+														int n_bases,
+														int n_loc_bases,
+														int global_vector_size,
+														int n_pts,
+														double *lambda,
+														double *mu) const
 		{
 			int grid = (n_bases % NUMBER_THREADS == 0) ? n_bases / NUMBER_THREADS : n_bases / NUMBER_THREADS + 1;
 			int threads = (n_bases > NUMBER_THREADS) ? NUMBER_THREADS : n_bases;
 
 			thrust::device_vector<double> energy_dev(1, double(0.0));
 			double *energy_ptr = thrust::raw_pointer_cast(energy_dev.data());
-
-			compute_energy_gpu_aux<double><<<grid, threads>>>(displacement_dev_ptr, jac_it_dev_ptr, global_data_dev_ptr, da_dev_ptr, grad_dev_ptr, n_bases, n_loc_bases, global_vector_size, n_pts, size(), lambda, mu, energy_ptr);
+			if (size() == 2)
+			{
+				if (n_loc_bases == 3)
+				{
+					compute_energy_gpu_aux<3, 2><<<grid, threads>>>(displacement_dev_ptr, jac_it_dev_ptr, global_data_dev_ptr, da_dev_ptr, grad_dev_ptr, n_bases, n_loc_bases, global_vector_size, n_pts, size(), lambda, mu, energy_ptr);
+				}
+				else if (n_loc_bases == 6)
+				{
+					compute_energy_gpu_aux<6, 2><<<grid, threads>>>(displacement_dev_ptr, jac_it_dev_ptr, global_data_dev_ptr, da_dev_ptr, grad_dev_ptr, n_bases, n_loc_bases, global_vector_size, n_pts, size(), lambda, mu, energy_ptr);
+				}
+				else if (n_loc_bases == 10)
+				{
+					compute_energy_gpu_aux<10, 2><<<grid, threads>>>(displacement_dev_ptr, jac_it_dev_ptr, global_data_dev_ptr, da_dev_ptr, grad_dev_ptr, n_bases, n_loc_bases, global_vector_size, n_pts, size(), lambda, mu, energy_ptr);
+				}
+				else
+				{
+					compute_energy_gpu_aux<Eigen::Dynamic, 2><<<grid, threads>>>(displacement_dev_ptr, jac_it_dev_ptr, global_data_dev_ptr, da_dev_ptr, grad_dev_ptr, n_bases, n_loc_bases, global_vector_size, n_pts, size(), lambda, mu, energy_ptr);
+				}
+			}
+			else // if (size() == 3)
+			{
+				assert(size() == 3);
+				if (n_loc_bases == 4)
+				{
+					compute_energy_gpu_aux<4, 3><<<grid, threads>>>(displacement_dev_ptr, jac_it_dev_ptr, global_data_dev_ptr, da_dev_ptr, grad_dev_ptr, n_bases, n_loc_bases, global_vector_size, n_pts, size(), lambda, mu, energy_ptr);
+				}
+				else if (n_loc_bases == 10)
+				{
+					compute_energy_gpu_aux<10, 3><<<grid, threads>>>(displacement_dev_ptr, jac_it_dev_ptr, global_data_dev_ptr, da_dev_ptr, grad_dev_ptr, n_bases, n_loc_bases, global_vector_size, n_pts, size(), lambda, mu, energy_ptr);
+				}
+				else if (n_loc_bases == 20)
+				{
+					compute_energy_gpu_aux<20, 3><<<grid, threads>>>(displacement_dev_ptr, jac_it_dev_ptr, global_data_dev_ptr, da_dev_ptr, grad_dev_ptr, n_bases, n_loc_bases, global_vector_size, n_pts, size(), lambda, mu, energy_ptr);
+				}
+				else
+				{
+					compute_energy_gpu_aux<Eigen::Dynamic, 3><<<grid, threads>>>(displacement_dev_ptr, jac_it_dev_ptr, global_data_dev_ptr, da_dev_ptr, grad_dev_ptr, n_bases, n_loc_bases, global_vector_size, n_pts, size(), lambda, mu, energy_ptr);
+				}
+			}
 
 			gpuErrchk(cudaPeekAtLastError());
 			CHECK_CUDA_ERROR(cudaDeviceSynchronize());

@@ -110,6 +110,7 @@ namespace polyfem
 	void State::solve_transient_tensor_nonlinear(const int time_steps, const double t0, const double dt)
 	{
 #ifdef USE_GPU
+		printing_GPU_info();
 		sending_data_to_GPU();
 #endif
 		init_nonlinear_tensor_solve(t0 + dt);
@@ -139,6 +140,29 @@ namespace polyfem
 			resolve_output_path(args["output"]["data"]["u_path"]),
 			resolve_output_path(args["output"]["data"]["v_path"]),
 			resolve_output_path(args["output"]["data"]["a_path"]));
+	}
+
+	void State::printing_GPU_info()
+	{
+		size_t free_bytes = 0, total_bytes = 0;
+		cudaMemGetInfo(&free_bytes, &total_bytes);
+		std::cout << "Mem GPU Free : " << free_bytes << " bytes" << std::endl;
+		std::cout << "Mem GPU Total: " << total_bytes << " bytes" << std::endl;
+		size_t sizeLimit = 0;
+		cudaDeviceGetLimit(&sizeLimit, cudaLimitMallocHeapSize);
+		std::cout << "Original device heap sizeLimit: " << sizeLimit << std::endl;
+		int n_elements = int(bases.size());
+		/*
+		std::cout << "SharedMemoryRequired: "
+		  << ":" << CALCULATE SIZE!
+		  << std::endl;
+		*/
+		if (n_elements > 5000)
+		{
+			cudaDeviceSetLimit(cudaLimitMallocHeapSize, sizeLimit * 4);
+			cudaDeviceGetLimit(&sizeLimit, cudaLimitMallocHeapSize);
+			std::cout << "Current device heap sizeLimit: " << sizeLimit << std::endl;
+		}
 	}
 
 	void State::sending_data_to_GPU()

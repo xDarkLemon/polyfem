@@ -252,6 +252,7 @@ namespace polyfem
 			else
 				return 0;
 		}
+
 		void AssemblerUtils::assemble_energy_gradient(const std::string &assembler,
 													  const bool is_volume,
 													  const int n_basis,
@@ -352,28 +353,6 @@ namespace polyfem
 			if (assembler == "NeoHookean")
 			{
 				static mapping_pair **mapping_gpu_dev = nullptr;
-				static int flag_gpu_settings = 0;
-				if (!flag_gpu_settings)
-				{
-					size_t free_bytes = 0, total_bytes = 0;
-					cudaMemGetInfo(&free_bytes, &total_bytes);
-					std::cout << "Mem GPU Free : " << free_bytes << " bytes" << std::endl;
-					std::cout << "Mem GPU Total: " << total_bytes << " bytes" << std::endl;
-					size_t sizeLimit = 0;
-					cudaDeviceGetLimit(&sizeLimit, cudaLimitMallocHeapSize);
-					std::cout << "Original device heap sizeLimit: " << sizeLimit << std::endl;
-
-					// cudaDeviceSetLimit( cudaLimitMallocHeapSize, free_bytes );
-
-					// cudaDeviceGetLimit( &sizeLimit, cudaLimitMallocHeapSize );
-					// std::cout << "Current device heap sizeLimit: " << sizeLimit << std::endl;
-					/*
-					std::cout << "SharedMemoryRequired: "
-					  << ":" << size_inner_index*sizeof(double)
-					  << std::endl;
-					*/
-					flag_gpu_settings++;
-				}
 
 				if (!mat_cache.non_zeros())
 				{

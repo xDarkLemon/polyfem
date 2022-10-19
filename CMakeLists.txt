@@ -26,14 +26,14 @@ if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/PolyFEMOptions.cmake)
     include(${CMAKE_CURRENT_SOURCE_DIR}/PolyFEMOptions.cmake)
 endif()
 
-################################################################################
+# ###############################################################################
 # CMake Policies
-################################################################################
+# ###############################################################################
 
 # cmake_policy(VERSION 3.24)
 # cmake_policy(SET CMP0135 NEW) # https://cmake.org/cmake/help/latest/policy/CMP0135.html
 
-################################################################################
+# ###############################################################################
 project(PolyFEM DESCRIPTION "A polyvalent C++ FEM library")
 
 # ###############################################################################
@@ -50,9 +50,9 @@ endif()
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/recipes/")
 
-#SETTING OPT 0 compiler flag for DEBUG mode
-#string(REGEX REPLACE "(\-O[011123456789])" "" CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG}")
-#set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -O0")
+# SETTING OPT 0 compiler flag for DEBUG mode
+# string(REGEX REPLACE "(\-O[011123456789])" "" CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG}")
+# set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -O0")
 
 # Color output
 include(UseColors)
@@ -184,11 +184,11 @@ target_compile_definitions(polyfem PUBLIC -DPOLYFEM_BIG_N=${POLYFEM_BIG_N})
 
 target_compile_definitions(polyfem PUBLIC POLYFEM_INPUT_SPEC="${CMAKE_SOURCE_DIR}/input-spec.json")
 
-if (MSVC)
+if(MSVC)
     add_compile_options(/bigobj)
-endif ()
+endif()
 
-################################################################################
+# ###############################################################################
 # Required libraries
 # ###############################################################################
 
@@ -252,11 +252,9 @@ target_link_libraries(polyfem PUBLIC tinyexpr::tinyexpr)
 include(tinyxml)
 target_link_libraries(polyfem PUBLIC tinyxml2)
 
-
 # jse library
 include(jse)
 target_link_libraries(polyfem PUBLIC jse::jse)
-
 
 if(POLYFEM_WITH_REMESHING)
     # wmtk library
@@ -283,7 +281,7 @@ target_link_libraries(polyfem PUBLIC Glob::Glob)
 # Extra warnings (include this at the end to have highest priority)
 target_link_libraries(polyfem PRIVATE polyfem::warnings)
 
-################################################################################
+# ###############################################################################
 # Optional libraries
 # ###############################################################################
 
@@ -321,7 +319,7 @@ if(POLYFEM_WITH_CLIPPER)
     target_compile_definitions(polyfem PUBLIC -DPOLYFEM_WITH_CLIPPER)
 endif()
 
-################################################################################
+# ###############################################################################
 # Polyfem binary
 # ###############################################################################
 
@@ -334,9 +332,9 @@ if(POLYFEM_TOPLEVEL_PROJECT)
     include(cli11)
     target_link_libraries(${PROJECT_NAME}_bin
         PUBLIC
-            polyfem::polyfem
-            polyfem::warnings
-            CLI11::CLI11
+        polyfem::polyfem
+        polyfem::warnings
+        CLI11::CLI11
     )
 
     if(NOT(${CMAKE_VERSION} VERSION_LESS "3.6.0"))
@@ -386,9 +384,9 @@ endif()
 # target_include_directories(polyfem PUBLIC ${Thrust_INCLUDE_DIRS})
 # target_link_libraries(polyfem PUBLIC Thrust)
 
-#USING AS SHARED LIBRARY
+# USING AS SHARED LIBRARY
 
-#set(CUDA_USE_STATIC_CUDA_RUNTIME OFF CACHE INTERNAL "") 
+# set(CUDA_USE_STATIC_CUDA_RUNTIME OFF CACHE INTERNAL "")
 include(CheckLanguage)
 check_language(CUDA)
 
@@ -399,9 +397,10 @@ else()
 endif()
 
 set_target_properties(polyfem PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
-#SETTING OPT 0 compiler flag for DEBUG mode
-#string(REGEX REPLACE "(\-O[011123456789])" "" CMAKE_CUDA_FLAGS_DEBUG "${CMAKE_CUDA_FLAGS_DEBUG}")
-#set(CMAKE_CUDA_FLAGS_DEBUG "${CMAKE_CUDA_FLAGS_DEBUG} -O0 -G")
+
+# SETTING OPT 0 compiler flag for DEBUG mode
+# string(REGEX REPLACE "(\-O[011123456789])" "" CMAKE_CUDA_FLAGS_DEBUG "${CMAKE_CUDA_FLAGS_DEBUG}")
+# set(CMAKE_CUDA_FLAGS_DEBUG "${CMAKE_CUDA_FLAGS_DEBUG} -O0 -G")
 
 # foreach(flag IN LISTS ${CXX17_FEATURES})
 # add_compile_options("$<$<COMPILE_LANGUAGE:CUDA>:--compiler-options=${flag}>")
@@ -414,16 +413,20 @@ if(NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
     set(CMAKE_CUDA_ARCHITECTURES 60 70 75 86)
 endif()
 
-#set(CMAKE_CUDA_FLAGS "-shared -cudart shared -Xcompiler -fPIC"
-#CACHE STRING "Use libcudart.dylib" FORCE)
+# set(CMAKE_CUDA_FLAGS "-shared -cudart shared -Xcompiler -fPIC"
+# CACHE STRING "Use libcudart.dylib" FORCE)
 
-#target_link_libraries(polyfem PRIVATE cudart) #MUST!!
-
-
+# target_link_libraries(polyfem PRIVATE cudart) #MUST!!
 set_target_properties(polyfem PROPERTIES CUDA_ARCHITECTURES "60;70;75;86")
 set_target_properties(PolyFEM_bin PROPERTIES CUDA_ARCHITECTURES "60;70;75;86")
 
-# endif()
+target_link_libraries(${PROJECT_NAME}_bin
+    PUBLIC
+    -lcublas
+    -lcurand
+    ${CUDA_cusparse_LIBRARY}
+)
 
 target_link_libraries(polyfem PUBLIC ${CUDA_cusparse_LIBRARY})
-target_link_libraries(PolyFEM_bin PUBLIC ${CUDA_cusparse_LIBRARY})
+
+# endif()

@@ -189,8 +189,7 @@ namespace polyfem
 						logger().trace("done is_step_valid for LS {}s...", timerg.getElapsedTime());
 
 						logger().trace("ls it: {} delta: {} invalid: {} ", this->cur_iter, (cur_energy - old_energy), !is_step_valid);
-
-						// if (!std::isfinite(cur_energy) || (cur_energy >= old_energy && fabs(cur_energy - old_energy) > 1e-12) || !is_step_valid)
+						//  if (!std::isfinite(cur_energy) || (cur_energy >= old_energy && fabs(cur_energy - old_energy) > 1e-12) || !is_step_valid)
 						if (!std::isfinite(cur_energy) || cur_energy > old_energy || !is_step_valid)
 						{
 							step_size /= 2.0;

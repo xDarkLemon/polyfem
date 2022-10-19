@@ -65,17 +65,17 @@ namespace polyfem::assembler
 
 		double compute_energy(const NonLinearAssemblerData &data) const;
 
-		int compute_energy_gpu(double *displacement_dev_ptr,
-							   Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, 0, 3, 3> *jac_it_dev_ptr,
-							   basis::Local2Global_GPU *global_data_dev_ptr,
-							   Eigen::Matrix<double, -1, 1, 0, 3, 1> *da_dev_ptr,
-							   Eigen::Matrix<double, -1, -1, 0, 3, 3> *grad_dev_ptr,
-							   int n_bases,
-							   int n_loc_bases,
-							   int global_columns_N,
-							   int n_pts,
-							   double *lambda_ptr,
-							   double *mu_ptr) const;
+		double compute_energy_gpu(double *displacement_dev_ptr,
+								  Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, 0, 3, 3> *jac_it_dev_ptr,
+								  basis::Local2Global_GPU *global_data_dev_ptr,
+								  Eigen::Matrix<double, -1, 1, 0, 3, 1> *da_dev_ptr,
+								  Eigen::Matrix<double, -1, -1, 0, 3, 3> *grad_dev_ptr,
+								  int n_bases,
+								  int n_loc_bases,
+								  int global_columns_N,
+								  int n_pts,
+								  double *lambda_ptr,
+								  double *mu_ptr) const;
 		//					   double *energy_storage) const;
 
 		// rhs for fabbricated solution, compute with automatic sympy code

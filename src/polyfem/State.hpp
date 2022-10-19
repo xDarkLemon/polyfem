@@ -306,8 +306,10 @@ namespace polyfem
 		SolveData solve_data;
 		/// initialize solver
 		void init_solve();
-		/// sending data to GPU for Elastic form
+		/// sending data to GPU (cache compute)
 		void sending_data_to_GPU();
+		/// prints GPU memory info
+		void printing_GPU_info();
 		/// solves transient navier stokes with operator splitting
 		/// @param[in] time_steps number of time steps
 		/// @param[in] dt timestep size

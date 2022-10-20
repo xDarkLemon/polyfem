@@ -120,7 +120,7 @@ int authenticate_json(std::string json_file, const bool allow_append)
 	out["err_linf"] = state.stats.linf_err;
 	out["err_linf_grad"] = state.stats.grad_max_err;
 	out["err_lp"] = state.stats.lp_err;
-	out["margin"] = 1e-5;
+	out["margin"] = 1e-4;
 	out["time_steps"] = time_steps;
 
 	std::vector<std::string> test_keys =
@@ -130,12 +130,12 @@ int authenticate_json(std::string json_file, const bool allow_append)
 	{
 		spdlog::info("Authenticating..");
 		json authen = in_args.at(tests_key);
-		double margin = authen.value("margin", 1e-5);
+		double margin = 1e-4;
 		for (const std::string &key : test_keys)
 		{
 			const double prev_val = authen[key];
 			const double curr_val = out[key];
-			const double relerr = std::abs((curr_val - prev_val) / std::max(std::abs(prev_val), 1e-5));
+			const double relerr = std::abs((curr_val - prev_val) / std::max(std::abs(prev_val), 1e-4));
 			if (relerr > margin)
 			{
 				spdlog::error("Violating Authenticate prev_{0}={1} curr_{0}={2}", key, prev_val, curr_val);

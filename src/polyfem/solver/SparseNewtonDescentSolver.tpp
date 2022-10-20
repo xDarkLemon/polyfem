@@ -80,7 +80,7 @@ namespace cppoptlib
 			return compute_update_direction(objFunc, x, grad, direction);
 
 #ifdef USE_NONLINEAR_GPU
-		if (!check_direction_gpu(hessian, grad, direction))
+		if (!check_direction(hessian, grad, direction))
 			return compute_update_direction(objFunc, x, grad, direction);
 #endif
 #ifndef USE_NONLINEAR_GPU

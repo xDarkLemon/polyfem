@@ -250,10 +250,7 @@ namespace polyfem
 												   const Eigen::MatrixXd &displacement_prev,
 												   const DATA_POINTERS_GPU &data_gpu) const
 		{
-			if (assembler == "NeoHookean")
-				return neo_hookean_elasticity_.assemble_GPU(data_gpu, displacement);
-			else
-				return 0;
+			return neo_hookean_elasticity_.assemble_GPU(data_gpu, displacement);
 		}
 
 		void AssemblerUtils::assemble_energy_gradient(const std::string &assembler,
@@ -296,11 +293,7 @@ namespace polyfem
 														  Eigen::MatrixXd &grad,
 														  const DATA_POINTERS_GPU &data_gpu) const
 		{
-
-			if (assembler == "NeoHookean")
-				neo_hookean_elasticity_.assemble_grad_GPU(data_gpu, n_basis, displacement, grad);
-			else
-				return;
+			neo_hookean_elasticity_.assemble_grad_GPU(data_gpu, n_basis, displacement, grad);
 		}
 
 		void AssemblerUtils::assemble_energy_hessian(const std::string &assembler,
@@ -352,51 +345,45 @@ namespace polyfem
 														 const DATA_POINTERS_GPU &data_gpu) const
 		{
 			igl::Timer timerg;
+			static mapping_pair **mapping_gpu_dev = nullptr;
 
-			if (assembler == "NeoHookean")
+			if (!mat_cache.non_zeros())
 			{
-				static mapping_pair **mapping_gpu_dev = nullptr;
+				timerg.start();
+				neo_hookean_elasticity_.assemble_hessian(is_volume, n_basis, project_to_psd, bases, gbases, cache, dt, displacement, displacement_prev, mat_cache, hessian);
 
-				if (!mat_cache.non_zeros())
+				auto mapping = mat_cache.mapping_to_gpu();
+				int size_rows = mapping.size();
+				std::vector<mapping_pair *> mapping_gpu(size_rows);
+
+				// NEEDS TO BE FREED?
+				mapping_gpu_dev = ALLOCATE_GPU(mapping_gpu_dev, sizeof(mapping_pair *) * size_rows);
+
+				for (int i = 0; i < size_rows; i++)
 				{
-					timerg.start();
-					neo_hookean_elasticity_.assemble_hessian(is_volume, n_basis, project_to_psd, bases, gbases, cache, dt, displacement, displacement_prev, mat_cache, hessian);
+					int size_val = mapping[i].size();
+					std::vector<mapping_pair> vec_pair(size_val);
 
-					auto mapping = mat_cache.mapping_to_gpu();
-					int size_rows = mapping.size();
-					std::vector<mapping_pair *> mapping_gpu(size_rows);
+					mapping_gpu[i] = ALLOCATE_GPU(mapping_gpu[i], sizeof(mapping_pair) * size_val);
 
-					// NEEDS TO BE FREED?
-					mapping_gpu_dev = ALLOCATE_GPU(mapping_gpu_dev, sizeof(mapping_pair *) * size_rows);
-
-					for (int i = 0; i < size_rows; i++)
+					for (int j = 0; j < size_val; j++)
 					{
-						int size_val = mapping[i].size();
-						std::vector<mapping_pair> vec_pair(size_val);
-
-						mapping_gpu[i] = ALLOCATE_GPU(mapping_gpu[i], sizeof(mapping_pair) * size_val);
-
-						for (int j = 0; j < size_val; j++)
-						{
-							vec_pair[j].first = mapping[i][j].first;
-							vec_pair[j].second = mapping[i][j].second;
-						}
-
-						COPYDATATOGPU(mapping_gpu[i], vec_pair.data(), sizeof(mapping_pair) * size_val);
-						cudaDeviceSynchronize();
-						vec_pair.resize(0);
+						vec_pair[j].first = mapping[i][j].first;
+						vec_pair[j].second = mapping[i][j].second;
 					}
 
-					COPYDATATOGPU(mapping_gpu_dev, mapping_gpu.data(), sizeof(mapping_pair *) * size_rows);
+					COPYDATATOGPU(mapping_gpu[i], vec_pair.data(), sizeof(mapping_pair) * size_val);
 					cudaDeviceSynchronize();
-					timerg.stop();
-					logger().trace("done mapping and transfer calculation to GPU {}s...", timerg.getElapsedTime());
-					return;
+					vec_pair.resize(0);
 				}
-				neo_hookean_elasticity_.assemble_hessian_GPU(data_gpu, n_basis, displacement, mat_cache, hessian, mapping_gpu_dev);
-			}
-			else
+
+				COPYDATATOGPU(mapping_gpu_dev, mapping_gpu.data(), sizeof(mapping_pair *) * size_rows);
+				cudaDeviceSynchronize();
+				timerg.stop();
+				logger().trace("done mapping and transfer calculation to GPU {}s...", timerg.getElapsedTime());
 				return;
+			}
+			neo_hookean_elasticity_.assemble_hessian_GPU(data_gpu, n_basis, displacement, mat_cache, hessian, mapping_gpu_dev);
 		}
 
 		void AssemblerUtils::compute_scalar_value(const std::string &assembler,

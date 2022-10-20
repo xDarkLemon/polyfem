@@ -71,9 +71,7 @@ namespace
 		state->build_basis();
 		state->assemble_rhs();
 		state->assemble_stiffness_mat();
-
-		DATA_POINTERS_GPU data_gpu;
-		state->data_gpu_ = data_gpu;
+		state->sending_data_to_GPU();
 		return state;
 	}
 } // namespace

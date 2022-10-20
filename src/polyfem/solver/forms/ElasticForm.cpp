@@ -6,6 +6,8 @@
 
 namespace polyfem::solver
 {
+
+#ifdef USE_GPU
 	ElasticForm::ElasticForm(const int n_bases,
 							 const std::vector<basis::ElementBases> &bases,
 							 const std::vector<basis::ElementBases> &geom_bases,
@@ -28,7 +30,29 @@ namespace polyfem::solver
 		if (assembler_.is_linear(formulation_))
 			compute_cached_stiffness();
 	}
-
+#endif
+#ifndef USE_GPU
+	ElasticForm::ElasticForm(const int n_bases,
+							 const std::vector<basis::ElementBases> &bases,
+							 const std::vector<basis::ElementBases> &geom_bases,
+							 const assembler::AssemblerUtils &assembler,
+							 const assembler::AssemblyValsCache &ass_vals_cache,
+							 const std::string &formulation,
+							 const double dt,
+							 const bool is_volume)
+		: n_bases_(n_bases),
+		  bases_(bases),
+		  geom_bases_(geom_bases),
+		  assembler_(assembler),
+		  ass_vals_cache_(ass_vals_cache),
+		  formulation_(formulation),
+		  dt_(dt),
+		  is_volume_(is_volume)
+	{
+		if (assembler_.is_linear(formulation_))
+			compute_cached_stiffness();
+	}
+#endif
 	double ElasticForm::value_unweighted(const Eigen::VectorXd &x) const
 	{
 #ifdef USE_GPU

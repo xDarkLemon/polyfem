@@ -142,6 +142,7 @@ namespace polyfem
 			resolve_output_path(args["output"]["data"]["a_path"]));
 	}
 
+#ifdef USE_GPU
 	void State::printing_GPU_info()
 	{
 		size_t free_bytes = 0, total_bytes = 0;
@@ -276,7 +277,7 @@ namespace polyfem
 
 		return;
 	}
-
+#endif
 	void State::init_nonlinear_tensor_solve(const double t)
 	{
 		assert(!assembler.is_linear(formulation()) || is_contact_enabled()); // non-linear
@@ -308,12 +309,23 @@ namespace polyfem
 		assert(solve_data.rhs_assembler != nullptr);
 
 		std::vector<std::shared_ptr<Form>> forms;
+
+#ifdef USE_GPU
 		solve_data.elastic_form = std::make_shared<ElasticForm>(
 			n_bases, bases, geom_bases(),
 			assembler, ass_vals_cache,
 			formulation(),
 			problem->is_time_dependent() ? args["time"]["dt"].get<double>() : 0.0,
 			mesh->is_volume(), data_gpu_);
+#endif
+#ifndef USE_GPU
+		solve_data.elastic_form = std::make_shared<ElasticForm>(
+			n_bases, bases, geom_bases(),
+			assembler, ass_vals_cache,
+			formulation(),
+			problem->is_time_dependent() ? args["time"]["dt"].get<double>() : 0.0,
+			mesh->is_volume());
+#endif
 		forms.push_back(solve_data.elastic_form);
 
 		solve_data.body_form = std::make_shared<BodyForm>(
@@ -337,12 +349,22 @@ namespace polyfem
 			}
 			if (assembler.has_damping())
 			{
+#ifdef USE_GPU
 				solve_data.damping_form = std::make_shared<ElasticForm>(
 					n_bases, bases, geom_bases(),
 					assembler, ass_vals_cache,
 					"Damping",
 					args["time"]["dt"],
 					mesh->is_volume(), data_gpu_);
+#endif
+#ifndef USE_GPU
+				solve_data.damping_form = std::make_shared<ElasticForm>(
+					n_bases, bases, geom_bases(),
+					assembler, ass_vals_cache,
+					"Damping",
+					args["time"]["dt"],
+					mesh->is_volume());
+#endif
 				forms.push_back(solve_data.damping_form);
 			}
 		}

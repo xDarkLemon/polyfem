@@ -130,7 +130,7 @@ option(LIBIGL_WITH_VIEWER "Use OpenGL viewer" OFF)
 option(LIBIGL_WITH_XML "Use XML" OFF)
 option(LIBIGL_WITH_TETGEN "Use Tetgen" OFF)
 
-set(WITH_GPU ON)
+set(WITH_GPU OFF)
 
 if(WITH_GPU)
     message(STATUS "USING GPU")
@@ -270,6 +270,11 @@ target_link_libraries(polyfem PUBLIC hdf5::hdf5)
 include(high_five)
 target_link_libraries(polyfem PUBLIC HighFive::HighFive)
 
+# Thrust
+# include(thrust)
+# target_link_libraries(polyfem PUBLIC Thrust::Thrust)
+
+# ###############################################################################
 # natsort library
 include(natsort)
 target_link_libraries(polyfem PUBLIC natsort::natsort)
@@ -387,46 +392,40 @@ endif()
 # USING AS SHARED LIBRARY
 
 # set(CUDA_USE_STATIC_CUDA_RUNTIME OFF CACHE INTERNAL "")
-include(CheckLanguage)
-check_language(CUDA)
+if(WITH_GPU)
+    include(CheckLanguage)
+    check_language(CUDA)
 
-if(CMAKE_CUDA_COMPILER)
-    enable_language(CUDA)
-else()
-    message(FATAL_ERROR "No CUDA support found!")
+    if(CMAKE_CUDA_COMPILER)
+        enable_language(CUDA)
+    else()
+        message(FATAL_ERROR "No CUDA support found!")
+    endif()
+
+    set_target_properties(polyfem PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
+
+    # SETTING OPT 0 compiler flag for DEBUG mode
+    # string(REGEX REPLACE "(\-O[011123456789])" "" CMAKE_CUDA_FLAGS_DEBUG "${CMAKE_CUDA_FLAGS_DEBUG}")
+    # set(CMAKE_CUDA_FLAGS_DEBUG "${CMAKE_CUDA_FLAGS_DEBUG} -O0 -G")
+
+    # foreach(flag IN LISTS ${CXX17_FEATURES})
+    # add_compile_options("$<$<COMPILE_LANGUAGE:CUDA>:--compiler-options=${flag}>")
+    # endforeach()
+    # Nvidia RTX8000 -> compute_75
+    # Nvidia V100 -> compute_70
+    # Nvidia 1080/1080Ti -> compute_61
+    # Nvidia 3080Ti -> compute_86
+    if(NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
+        set(CMAKE_CUDA_ARCHITECTURES 60 70 75 86)
+    endif()
+
+    set_target_properties(polyfem PROPERTIES CUDA_ARCHITECTURES "60;70;75;86")
+    set_target_properties(PolyFEM_bin PROPERTIES CUDA_ARCHITECTURES "60;70;75;86")
+    target_link_libraries(${PROJECT_NAME}_bin
+        PUBLIC
+        -lcublas
+        -lcurand
+        ${CUDA_cusparse_LIBRARY}
+    )
+    target_link_libraries(polyfem PUBLIC ${CUDA_cusparse_LIBRARY})
 endif()
-
-set_target_properties(polyfem PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
-
-# SETTING OPT 0 compiler flag for DEBUG mode
-# string(REGEX REPLACE "(\-O[011123456789])" "" CMAKE_CUDA_FLAGS_DEBUG "${CMAKE_CUDA_FLAGS_DEBUG}")
-# set(CMAKE_CUDA_FLAGS_DEBUG "${CMAKE_CUDA_FLAGS_DEBUG} -O0 -G")
-
-# foreach(flag IN LISTS ${CXX17_FEATURES})
-# add_compile_options("$<$<COMPILE_LANGUAGE:CUDA>:--compiler-options=${flag}>")
-# endforeach()
-# Nvidia RTX8000 -> compute_75
-# Nvidia V100 -> compute_70
-# Nvidia 1080/1080Ti -> compute_61
-# Nvidia 3080Ti -> compute_86
-if(NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
-    set(CMAKE_CUDA_ARCHITECTURES 60 70 75 86)
-endif()
-
-# set(CMAKE_CUDA_FLAGS "-shared -cudart shared -Xcompiler -fPIC"
-# CACHE STRING "Use libcudart.dylib" FORCE)
-
-# target_link_libraries(polyfem PRIVATE cudart) #MUST!!
-set_target_properties(polyfem PROPERTIES CUDA_ARCHITECTURES "60;70;75;86")
-set_target_properties(PolyFEM_bin PROPERTIES CUDA_ARCHITECTURES "60;70;75;86")
-
-target_link_libraries(${PROJECT_NAME}_bin
-    PUBLIC
-    -lcublas
-    -lcurand
-    ${CUDA_cusparse_LIBRARY}
-)
-
-target_link_libraries(polyfem PUBLIC ${CUDA_cusparse_LIBRARY})
-
-# endif()

@@ -10,7 +10,9 @@
 
 #include <finitediff.hpp>
 
+#ifdef USE_GPU
 #include <polyfem/utils/CUDA_utilities.cuh>
+#endif
 
 #include <polyfem/State.hpp>
 
@@ -71,7 +73,10 @@ namespace
 		state->build_basis();
 		state->assemble_rhs();
 		state->assemble_stiffness_mat();
+
+#ifdef USE_GPU
 		state->sending_data_to_GPU();
+#endif
 		return state;
 	}
 } // namespace
@@ -185,6 +190,8 @@ TEST_CASE("contact form derivatives", "[form][form_derivatives][contact_form]")
 TEST_CASE("elastic form derivatives", "[form][form_derivatives][elastic_form]")
 {
 	const auto state_ptr = get_state();
+
+#ifdef USE_GPU
 	ElasticForm form(
 		state_ptr->n_bases,
 		state_ptr->bases,
@@ -194,6 +201,18 @@ TEST_CASE("elastic form derivatives", "[form][form_derivatives][elastic_form]")
 		state_ptr->formulation(),
 		state_ptr->args["time"]["dt"],
 		state_ptr->mesh->is_volume(), state_ptr->data_gpu_);
+#endif
+#ifndef USE_GPU
+	ElasticForm form(
+		state_ptr->n_bases,
+		state_ptr->bases,
+		state_ptr->geom_bases(),
+		state_ptr->assembler,
+		state_ptr->ass_vals_cache,
+		state_ptr->formulation(),
+		state_ptr->args["time"]["dt"],
+		state_ptr->mesh->is_volume());
+#endif
 	test_form(form, *state_ptr);
 }
 
@@ -232,7 +251,7 @@ TEST_CASE("damping form derivatives", "[form][form_derivatives][damping_form]")
 {
 	const auto state_ptr = get_state();
 	const double dt = 1e-2;
-
+#ifdef USE_GPU
 	ElasticForm form(
 		state_ptr->n_bases,
 		state_ptr->bases,
@@ -242,6 +261,18 @@ TEST_CASE("damping form derivatives", "[form][form_derivatives][damping_form]")
 		"Damping",
 		dt,
 		state_ptr->mesh->is_volume(), state_ptr->data_gpu_);
+#endif
+#ifndef USE_GPU
+	ElasticForm form(
+		state_ptr->n_bases,
+		state_ptr->bases,
+		state_ptr->geom_bases(),
+		state_ptr->assembler,
+		state_ptr->ass_vals_cache,
+		"Damping",
+		dt,
+		state_ptr->mesh->is_volume());
+#endif
 	form.update_quantities(0, Eigen::VectorXd::Ones(state_ptr->n_bases * 2));
 	test_form(form, *state_ptr);
 }

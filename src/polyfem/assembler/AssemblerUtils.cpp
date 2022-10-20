@@ -1,5 +1,10 @@
 #include <polyfem/assembler/AssemblerUtils.hpp>
 #include <polyfem/utils/Logger.hpp>
+#ifdef USE_GPU
+#include <thrust/device_vector.h>
+#include <thrust/copy.h>
+#include <thrust/host_vector.h>
+#endif
 #include <unsupported/Eigen/SparseExtra>
 
 #include <igl/Timer.h>
@@ -237,19 +242,6 @@ namespace polyfem
 				return 0;
 		}
 
-		double AssemblerUtils::assemble_energy_GPU(const std::string &assembler,
-												   const bool is_volume,
-												   const std::vector<ElementBases> &bases,
-												   const std::vector<ElementBases> &gbases,
-												   const AssemblyValsCache &cache,
-												   const double dt,
-												   const Eigen::MatrixXd &displacement,
-												   const Eigen::MatrixXd &displacement_prev,
-												   const DATA_POINTERS_GPU &data_gpu) const
-		{
-			return neo_hookean_elasticity_.assemble_GPU(data_gpu, displacement);
-		}
-
 		void AssemblerUtils::assemble_energy_gradient(const std::string &assembler,
 													  const bool is_volume,
 													  const int n_basis,
@@ -278,21 +270,6 @@ namespace polyfem
 			else
 				return;
 		}
-		void AssemblerUtils::assemble_energy_gradient_GPU(const std::string &assembler,
-														  const bool is_volume,
-														  const int n_basis,
-														  const std::vector<ElementBases> &bases,
-														  const std::vector<ElementBases> &gbases,
-														  const AssemblyValsCache &cache,
-														  const double dt,
-														  const Eigen::MatrixXd &displacement,
-														  const Eigen::MatrixXd &displacement_prev,
-														  Eigen::MatrixXd &grad,
-														  const DATA_POINTERS_GPU &data_gpu) const
-		{
-			neo_hookean_elasticity_.assemble_grad_GPU(data_gpu, n_basis, displacement, grad);
-		}
-
 		void AssemblerUtils::assemble_energy_hessian(const std::string &assembler,
 													 const bool is_volume,
 													 const int n_basis,
@@ -325,6 +302,35 @@ namespace polyfem
 			//	ogden_elasticity_.assemble_hessian(is_volume, n_basis, project_to_psd, bases, gbases, cache, dt, displacement, displacement_prev, mat_cache, hessian);
 			else
 				return;
+		}
+
+#ifdef USE_GPU
+		double AssemblerUtils::assemble_energy_GPU(const std::string &assembler,
+												   const bool is_volume,
+												   const std::vector<ElementBases> &bases,
+												   const std::vector<ElementBases> &gbases,
+												   const AssemblyValsCache &cache,
+												   const double dt,
+												   const Eigen::MatrixXd &displacement,
+												   const Eigen::MatrixXd &displacement_prev,
+												   const DATA_POINTERS_GPU &data_gpu) const
+		{
+			return neo_hookean_elasticity_.assemble_GPU(data_gpu, displacement);
+		}
+
+		void AssemblerUtils::assemble_energy_gradient_GPU(const std::string &assembler,
+														  const bool is_volume,
+														  const int n_basis,
+														  const std::vector<ElementBases> &bases,
+														  const std::vector<ElementBases> &gbases,
+														  const AssemblyValsCache &cache,
+														  const double dt,
+														  const Eigen::MatrixXd &displacement,
+														  const Eigen::MatrixXd &displacement_prev,
+														  Eigen::MatrixXd &grad,
+														  const DATA_POINTERS_GPU &data_gpu) const
+		{
+			neo_hookean_elasticity_.assemble_grad_GPU(data_gpu, n_basis, displacement, grad);
 		}
 
 		void AssemblerUtils::assemble_energy_hessian_GPU(const std::string &assembler,
@@ -382,7 +388,7 @@ namespace polyfem
 			}
 			neo_hookean_elasticity_.assemble_hessian_GPU(data_gpu, n_basis, displacement, mat_cache, hessian, mapping_gpu_dev);
 		}
-
+#endif
 		void AssemblerUtils::compute_scalar_value(const std::string &assembler,
 												  const int el_id,
 												  const ElementBases &bs,

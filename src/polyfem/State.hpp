@@ -36,8 +36,9 @@
 
 #include <ipc/collision_mesh.hpp>
 #include <ipc/utils/logger.hpp>
-
+#ifdef USE_GPU
 #include <polyfem/utils/CUDA_utilities.cuh>
+#endif
 // Forward declaration
 namespace cppoptlib
 {
@@ -262,8 +263,10 @@ namespace polyfem
 		}
 
 		/// POINTERS AND SIZE ELEMENTS FOR GPU
-		DATA_POINTERS_GPU data_gpu_;
 
+#ifdef USE_GPU
+		DATA_POINTERS_GPU data_gpu_;
+#endif
 	private:
 		/// splits the solution in solution and pressure for mixed problems
 		void

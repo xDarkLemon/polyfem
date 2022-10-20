@@ -8,7 +8,9 @@
 
 #include <polyfem/utils/Types.hpp>
 
+#ifdef USE_GPU
 #include <polyfem/utils/CUDA_utilities.cuh>
+#endif
 namespace polyfem::solver
 {
 	/// @brief Form of the elasticity potential and forces
@@ -17,6 +19,8 @@ namespace polyfem::solver
 	public:
 		/// @brief Construct a new Elastic Form object
 		/// @param state Reference to the simulation state
+
+#ifdef USE_GPU
 		ElasticForm(const int n_bases,
 					const std::vector<basis::ElementBases> &bases,
 					const std::vector<basis::ElementBases> &geom_bases,
@@ -26,7 +30,17 @@ namespace polyfem::solver
 					const double dt,
 					const bool is_volume,
 					DATA_POINTERS_GPU &data_gpu);
-
+#endif
+#ifndef USE_GPU
+		ElasticForm(const int n_bases,
+					const std::vector<basis::ElementBases> &bases,
+					const std::vector<basis::ElementBases> &geom_bases,
+					const assembler::AssemblerUtils &assembler,
+					const assembler::AssemblyValsCache &ass_vals_cache,
+					const std::string &formulation,
+					const double dt,
+					const bool is_volume);
+#endif
 	protected:
 		/// @brief Compute the elastic potential value
 		/// @param x Current solution
@@ -68,7 +82,9 @@ namespace polyfem::solver
 		StiffnessMatrix cached_stiffness_;  ///< Cached stiffness matrix for linear elasticity
 		utils::SpareMatrixCache mat_cache_; ///< Matrix cache
 
+#ifdef USE_GPU
 		const DATA_POINTERS_GPU &data_gpu_;
+#endif
 		/// @brief Compute the stiffness matrix (cached)
 		void
 		compute_cached_stiffness();

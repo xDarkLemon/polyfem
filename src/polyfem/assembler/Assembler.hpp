@@ -6,7 +6,10 @@
 #include <polyfem/utils/MatrixUtils.hpp>
 #include <polyfem/utils/ElasticityUtils.hpp>
 
+#ifdef USE_GPU
 #include "polyfem/utils/CUDA_utilities.cuh"
+#include "cublas_v2.h"
+#endif
 
 #include <Eigen/Sparse>
 #include <vector>
@@ -109,7 +112,7 @@ namespace polyfem::assembler
 			const Eigen::MatrixXd &displacement,
 			const Eigen::MatrixXd &displacement_prev) const;
 
-		// assemble gradient of energy (rhs GPU version)
+#ifdef USE_GPU
 		void assemble_grad_GPU(
 			const DATA_POINTERS_GPU &data_gpu,
 			const int n_basis,
@@ -129,8 +132,11 @@ namespace polyfem::assembler
 		double assemble_GPU(
 			const DATA_POINTERS_GPU &data_gpu,
 			const Eigen::MatrixXd &displacement) const;
-
-		inline LocalAssembler &local_assembler() { return local_assembler_; }
+#endif
+		inline LocalAssembler &local_assembler()
+		{
+			return local_assembler_;
+		}
 		inline const LocalAssembler &local_assembler() const { return local_assembler_; }
 
 	private:

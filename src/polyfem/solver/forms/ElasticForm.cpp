@@ -32,9 +32,14 @@ namespace polyfem::solver
 	double ElasticForm::value_unweighted(const Eigen::VectorXd &x) const
 	{
 #ifdef USE_GPU
-		return assembler_.assemble_energy_GPU(
-			formulation_, is_volume_, bases_, geom_bases_,
-			ass_vals_cache_, dt_, x, x_prev_, data_gpu_);
+		if (formulation_ == "NeoHookean")
+			return assembler_.assemble_energy_GPU(
+				formulation_, is_volume_, bases_, geom_bases_,
+				ass_vals_cache_, dt_, x, x_prev_, data_gpu_);
+		else
+			return assembler_.assemble_energy(
+				formulation_, is_volume_, bases_, geom_bases_,
+				ass_vals_cache_, dt_, x, x_prev_);
 #endif
 #ifndef USE_GPU
 		return assembler_.assemble_energy(
@@ -48,9 +53,14 @@ namespace polyfem::solver
 		Eigen::MatrixXd grad;
 
 #ifdef USE_GPU
-		assembler_.assemble_energy_gradient_GPU(
-			formulation_, is_volume_, n_bases_, bases_, geom_bases_,
-			ass_vals_cache_, dt_, x, x_prev_, grad, data_gpu_);
+		if (formulation_ == "NeoHookean")
+			assembler_.assemble_energy_gradient_GPU(
+				formulation_, is_volume_, n_bases_, bases_, geom_bases_,
+				ass_vals_cache_, dt_, x, x_prev_, grad, data_gpu_);
+		else
+			assembler_.assemble_energy_gradient(
+				formulation_, is_volume_, n_bases_, bases_, geom_bases_,
+				ass_vals_cache_, dt_, x, x_prev_, grad);
 #endif
 #ifndef USE_GPU
 		assembler_.assemble_energy_gradient(
@@ -74,9 +84,14 @@ namespace polyfem::solver
 		else
 		{
 #ifdef USE_GPU
-			assembler_.assemble_energy_hessian_GPU(
-				formulation_, is_volume_, n_bases_, project_to_psd_, bases_,
-				geom_bases_, ass_vals_cache_, dt_, x, x_prev_, mat_cache_, hessian, data_gpu_);
+			if (formulation_ == "NeoHookean")
+				assembler_.assemble_energy_hessian_GPU(
+					formulation_, is_volume_, n_bases_, project_to_psd_, bases_,
+					geom_bases_, ass_vals_cache_, dt_, x, x_prev_, mat_cache_, hessian, data_gpu_);
+			else
+				assembler_.assemble_energy_hessian(
+					formulation_, is_volume_, n_bases_, project_to_psd_, bases_,
+					geom_bases_, ass_vals_cache_, dt_, x, x_prev_, mat_cache_, hessian);
 #endif
 #ifndef USE_GPU
 			// TODO: somehow remove mat_cache_ so this function can be marked const

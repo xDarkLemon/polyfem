@@ -139,7 +139,7 @@ else()
     message(STATUS "NOT USING GPU")
 endif()
 
-set(USE_NONLINEAR_GPU ON)
+set(USE_NONLINEAR_GPU OFF)
 
 if(USE_NONLINEAR_GPU)
     add_definitions(-DUSE_NONLINEAR_GPU)

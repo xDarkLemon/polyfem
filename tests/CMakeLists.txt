@@ -3,19 +3,19 @@
 # ###############################################################################
 
 set(test_sources
-	main.cpp
-	test_assembler.cpp
-	test_bases.cpp
-	test_matrix.cpp
+  main.cpp
+  test_assembler.cpp
+  test_bases.cpp
+  test_matrix.cpp
   test_cmesh.cpp
   test_ncmesh.cpp
-	test_normal.cpp
-	test_problem.cpp
-	test_quadrature.cpp
-	test_rbf.cpp
-	test_solver.cpp
-	test_tbb.cpp
-	test_utils.cpp
+  test_normal.cpp
+  test_problem.cpp
+  test_quadrature.cpp
+  test_rbf.cpp
+  test_solver.cpp
+  test_tbb.cpp
+  test_utils.cpp
   test_form_derivatives.cpp
   verify_run.cpp
 )
@@ -36,7 +36,7 @@ target_link_libraries(unit_tests PUBLIC Catch2::Catch2)
 include(finite_diff)
 target_link_libraries(unit_tests PUBLIC finitediff::finitediff)
 
-################################################################################
+# ###############################################################################
 # Compiler options
 # ###############################################################################
 include(polyfem_data)

@@ -169,40 +169,7 @@ namespace polyfem
 	{
 		logger().info("Start moving data to GPU");
 
-		// NEED TO FIND A WAY TO AVOID RECOMPUTATION OF PARAMETERS
-		LameParameters params_tmp_;
-
 		auto is_vol_ = mesh->is_volume();
-		const auto &body_params = args["materials"];
-		std::map<int, json> materials;
-		for (int i = 0; i < body_params.size(); ++i)
-		{
-			json mat = body_params[i];
-			json id = mat["id"];
-			if (id.is_array())
-			{
-				for (int j = 0; j < id.size(); ++j)
-					materials[id[j]] = mat;
-			}
-			else
-			{
-				const int mid = id;
-				materials[mid] = mat;
-			}
-		}
-
-		for (int e = 0; e < mesh->n_elements(); ++e)
-		{
-			const int bid = mesh->get_body_id(e);
-			const auto it = materials.find(bid);
-			if (it == materials.end())
-			{
-				continue;
-			}
-
-			const json &tmp = it->second;
-			params_tmp_.add_multimaterial(e, tmp, is_vol_);
-		}
 
 		int n_elements = 0;
 		int jac_it_size = 0;
@@ -283,7 +250,8 @@ namespace polyfem
 		{
 			for (int p = 0; p < n_pts; p++)
 			{
-				params_tmp_.lambda_mu(vals_array[e].quadrature.points.row(p), vals_array[e].val.row(p), vals_array[e].element_id, lambda, mu);
+				// params_tmp_.lambda_mu(vals_array[e].quadrature.points.row(p), vals_array[e].val.row(p), vals_array[e].element_id, lambda, mu);
+				assembler.lame_params().lambda_mu(vals_array[e].quadrature.points.row(p), vals_array[e].val.row(p), vals_array[e].element_id, lambda, mu);
 				COPYDATATOGPU(lambda_ptr + e * n_pts + p, &lambda, sizeof(double));
 				COPYDATATOGPU(mu_ptr + e * n_pts + p, &mu, sizeof(double));
 			}

@@ -70,14 +70,15 @@ namespace polyfem
 
 			const std::vector<int> &inner_index_to_gpu() const { return inner_index_; }
 			const std::vector<int> &outer_index_to_gpu() const { return outer_index_; }
-			const std::vector<std::vector<std::pair<int, size_t>>> &mapping_to_gpu() const { return mapping_; }
+			//	const std::vector<std::vector<std::pair<int, size_t>>> &mapping_to_gpu() const { return mapping_; }
+			const std::vector<std::vector<int>> &second_cache_to_gpu() const { return second_cache_; }
 
 		private:
 			size_t size_;
 			StiffnessMatrix tmp_, mat_;
 			std::vector<Eigen::Triplet<double>> entries_;              // ONLY EXISTS FOR ONE TIME AND BELONGS HERE NOT TO THE MAIN CACHE
 			std::vector<std::vector<std::pair<int, size_t>>> mapping_; // NOT aVAILABLE 1 TIME, MAPPING BELONGS TO MAT_CACHE (MAIN_CACHE)
-			std::vector<int> inner_index_, outer_index_;               //NOT AVAILABLE 1 TIME, OUTER AND INnER INDEX BELONGS TO MAT_CACHE (MAIN_CACHE)
+			std::vector<int> inner_index_, outer_index_;               // NOT AVAILABLE 1 TIME, OUTER AND INnER INDEX BELONGS TO MAT_CACHE (MAIN_CACHE)
 			std::vector<double> values_;                               // NOT AVAILABLE 1 TIME, VALUES BELONGS TO LOCAL_STORAGE.CACHE
 			const SpareMatrixCache *main_cache_ = nullptr;
 

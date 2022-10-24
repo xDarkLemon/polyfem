@@ -1,4 +1,8 @@
 #include "FullNLProblem.hpp"
+#include <polyfem/utils/Logger.hpp>
+//#include <polyfem/MaybeParallelFor.hpp>
+
+#include <igl/Timer.h>
 
 namespace polyfem::solver
 {
@@ -108,14 +112,21 @@ namespace polyfem::solver
 
 	void FullNLProblem::hessian(const TVector &x, THessian &hessian)
 	{
+
+		igl::Timer timerg;
 		hessian.resize(x.size(), x.size());
+
 		for (auto &f : forms_)
 		{
 			if (!f->enabled())
 				continue;
 			THessian tmp;
+
 			f->second_derivative(x, tmp);
+			timerg.start();
 			hessian += tmp;
+			timerg.stop();
+			logger().trace("done partial sum hessian -- {}s...", timerg.getElapsedTime());
 		}
 	}
 

@@ -47,7 +47,8 @@ namespace polyfem::assembler
 												 double *lambda_ptr,
 												 double *mu_ptr,
 												 int non_zeros,
-												 mapping_pair **mapping) const;
+												 //	 mapping_pair **mapping,
+												 int **second_cache) const;
 		// std::vector<double> &computed_values) const;
 
 		//			template <typename T>

@@ -90,7 +90,8 @@ namespace polyfem
 			const Eigen::MatrixXd &displacement,
 			SpareMatrixCache &mat_cache,
 			StiffnessMatrix &grad,
-			mapping_pair **mapping) const
+			//			mapping_pair **mapping,
+			int **second_cache) const
 		{
 			// This is done after calling assemble_hessian to obtain mapping
 
@@ -120,7 +121,8 @@ namespace polyfem
 																	data_gpu.lambda_ptr,
 																	data_gpu.mu_ptr,
 																	mat_cache.non_zeros(),
-																	mapping);
+																	//																	mapping,
+																	second_cache);
 
 			//			// WE NEED TO GO BACK HERE
 			//			//if (project_to_psd)

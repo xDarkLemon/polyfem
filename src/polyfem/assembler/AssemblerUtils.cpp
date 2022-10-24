@@ -348,45 +348,70 @@ namespace polyfem
 														 const DATA_POINTERS_GPU &data_gpu) const
 		{
 			igl::Timer timerg;
-			static mapping_pair **mapping_gpu_dev = nullptr;
+			//			static mapping_pair **mapping_gpu_dev = nullptr;
+			static int **second_cache_dev = nullptr;
 
 			if (!mat_cache.non_zeros())
 			{
 				timerg.start();
 				neo_hookean_elasticity_.assemble_hessian(is_volume, n_basis, project_to_psd, bases, gbases, cache, dt, displacement, displacement_prev, mat_cache, hessian);
 
-				auto mapping = mat_cache.mapping_to_gpu();
-				int size_rows = mapping.size();
-				std::vector<mapping_pair *> mapping_gpu(size_rows);
+				//				auto mapping = mat_cache.mapping_to_gpu();
+				auto second_cache = mat_cache.second_cache_to_gpu();
+
+				int sec_cache_rows = second_cache.size();
+				//				int size_rows = mapping.size();
+
+				//				std::vector<mapping_pair *> mapping_gpu(size_rows);
+				std::vector<int *> sec_cache_gpu(sec_cache_rows);
 
 				// NEEDS TO BE FREED?
-				mapping_gpu_dev = ALLOCATE_GPU(mapping_gpu_dev, sizeof(mapping_pair *) * size_rows);
+				//				mapping_gpu_dev = ALLOCATE_GPU(mapping_gpu_dev, sizeof(mapping_pair *) * size_rows);
+				second_cache_dev = ALLOCATE_GPU(second_cache_dev, sizeof(int *) * sec_cache_rows);
 
-				for (int i = 0; i < size_rows; i++)
+				for (int i = 0; i < sec_cache_rows; i++)
 				{
-					int size_val = mapping[i].size();
-					std::vector<mapping_pair> vec_pair(size_val);
+					int size_val = second_cache[i].size();
+					std::vector<int> sec_cache_index(size_val);
 
-					mapping_gpu[i] = ALLOCATE_GPU(mapping_gpu[i], sizeof(mapping_pair) * size_val);
+					sec_cache_gpu[i] = ALLOCATE_GPU(sec_cache_gpu[i], sizeof(int) * size_val);
 
 					for (int j = 0; j < size_val; j++)
 					{
-						vec_pair[j].first = mapping[i][j].first;
-						vec_pair[j].second = mapping[i][j].second;
+						sec_cache_index[j] = second_cache[i][j];
 					}
 
-					COPYDATATOGPU(mapping_gpu[i], vec_pair.data(), sizeof(mapping_pair) * size_val);
+					COPYDATATOGPU(sec_cache_gpu[i], sec_cache_index.data(), sizeof(int) * size_val);
 					cudaDeviceSynchronize();
-					vec_pair.resize(0);
+					sec_cache_index.resize(0);
 				}
 
-				COPYDATATOGPU(mapping_gpu_dev, mapping_gpu.data(), sizeof(mapping_pair *) * size_rows);
+				//				for (int i = 0; i < size_rows; i++)
+				//				{
+				//					int size_val = mapping[i].size();
+				//					std::vector<mapping_pair> vec_pair(size_val);
+				//
+				//					mapping_gpu[i] = ALLOCATE_GPU(mapping_gpu[i], sizeof(mapping_pair) * size_val);
+				//
+				//					for (int j = 0; j < size_val; j++)
+				//					{
+				//						vec_pair[j].first = mapping[i][j].first;
+				//						vec_pair[j].second = mapping[i][j].second;
+				//					}
+				//
+				//					COPYDATATOGPU(mapping_gpu[i], vec_pair.data(), sizeof(mapping_pair) * size_val);
+				//					cudaDeviceSynchronize();
+				//					vec_pair.resize(0);
+				//				}
+
+				//				COPYDATATOGPU(mapping_gpu_dev, mapping_gpu.data(), sizeof(mapping_pair *) * size_rows);
+				COPYDATATOGPU(second_cache_dev, sec_cache_gpu.data(), sizeof(int *) * sec_cache_rows);
 				cudaDeviceSynchronize();
 				timerg.stop();
 				logger().trace("done mapping and transfer calculation to GPU {}s...", timerg.getElapsedTime());
 				return;
 			}
-			neo_hookean_elasticity_.assemble_hessian_GPU(data_gpu, n_basis, displacement, mat_cache, hessian, mapping_gpu_dev);
+			neo_hookean_elasticity_.assemble_hessian_GPU(data_gpu, n_basis, displacement, mat_cache, hessian, /*mapping_gpu_dev,*/ second_cache_dev);
 		}
 #endif
 		void AssemblerUtils::compute_scalar_value(const std::string &assembler,

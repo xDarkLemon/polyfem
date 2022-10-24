@@ -126,7 +126,8 @@ namespace polyfem::assembler
 			const Eigen::MatrixXd &displacement,
 			utils::SpareMatrixCache &mat_cache,
 			StiffnessMatrix &grad,
-			mapping_pair **mapping) const;
+			//			mapping_pair **mapping,
+			int **second_cache) const;
 
 		// assemble energy (GPU version)
 		double assemble_GPU(

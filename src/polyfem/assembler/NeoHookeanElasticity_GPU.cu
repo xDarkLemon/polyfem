@@ -13,48 +13,6 @@ namespace polyfem
 
 	namespace assembler
 	{
-		/*
-		__device__ int kernel_mapping(int *outer, int size_outer, int *inner, int size_inner, int i, int j)
-		{
-			int index = -1;
-			int last_col = 0;
-
-			// ADD SOME SECURITY CHECK LIKE I J >= 0
-
-			for (size_t it_col = 0; it_col < j; ++it_col)
-			{
-				const auto start = outer[it_col];
-				const auto end = outer[it_col + 1];
-
-				for (size_t ii = start; ii < end; ++ii)
-				{
-					const auto it_row = inner[ii];
-					++index;
-				}
-				++last_col;
-			}
-
-			do
-			{
-				const auto start = outer[last_col];
-				const auto end = outer[last_col + 1];
-
-				for (size_t ii = start; ii < end; ++ii)
-				{
-					const auto it_row = inner[ii];
-					if (it_row == i)
-					{
-						++index;
-						break;
-					}
-					++index;
-				}
-				//++last_col;
-			} while (last_col < j);
-
-			return index;
-		}
-		*/
 
 		// ADD A MAX _ VAL OR STOP CONDITION FOR SECURITY
 		__device__ int kernel_mapping(mapping_pair **mapping, int i, int j)
@@ -332,7 +290,8 @@ namespace polyfem
 															int size_,
 															double *lambda,
 															double *mu,
-															mapping_pair **mapping,
+															//	mapping_pair **mapping,
+															int **second_cache,
 															double *computed_values)
 		{
 			// constexpr int N = (n_basis == Eigen::Dynamic) ? Eigen::Dynamic : n_basis * dim;
@@ -455,6 +414,7 @@ namespace polyfem
 				}
 
 				// syncthreads?
+				int it = 0;
 				for (int i = 0; i < n_loc_bases; ++i)
 				{
 					for (int j = 0; j < n_loc_bases; ++j)
@@ -473,8 +433,9 @@ namespace polyfem
 									{
 										const auto gj = global_data[b_index * n_loc_bases * global_vector_size + j * global_vector_size + jj].index * size_ + n;
 										const auto wj = global_data[b_index * n_loc_bases * global_vector_size + j * global_vector_size + jj].val;
-										const auto val_index = kernel_mapping(mapping, gi, gj);
-
+										// const auto val_index = kernel_mapping(mapping, gi, gj);
+										const auto val_index = second_cache[b_index][it];
+										it++;
 										atomicAdd(&computed_values[val_index], local_value * wi * wj);
 									}
 								}
@@ -482,7 +443,6 @@ namespace polyfem
 						}
 					}
 				}
-				__syncthreads();
 			}
 		}
 
@@ -628,7 +588,8 @@ namespace polyfem
 												   double *lambda,
 												   double *mu,
 												   int non_zeros,
-												   mapping_pair **mapping) const
+												   //  mapping_pair **mapping,
+												   int **second_cache) const
 		//									   std::vector<double> &computed_values) const
 		{
 			std::vector<double> computed_values(non_zeros, 0);
@@ -673,7 +634,8 @@ namespace polyfem
 																					 size(),
 																					 lambda,
 																					 mu,
-																					 mapping,
+																					 //	 mapping,
+																					 second_cache,
 																					 computed_values_ptr);
 					}
 					else if (n_loc_bases == 6)
@@ -692,7 +654,8 @@ namespace polyfem
 																					 size(),
 																					 lambda,
 																					 mu,
-																					 mapping,
+																					 //	 mapping,
+																					 second_cache,
 																					 computed_values_ptr);
 					}
 					else if (n_loc_bases == 10)
@@ -711,7 +674,8 @@ namespace polyfem
 																					  size(),
 																					  lambda,
 																					  mu,
-																					  mapping,
+																					  //	  mapping,
+																					  second_cache,
 																					  computed_values_ptr);
 					}
 				}
@@ -737,7 +701,8 @@ namespace polyfem
 																					 size(),
 																					 lambda,
 																					 mu,
-																					 mapping,
+																					 //	 mapping,
+																					 second_cache,
 																					 computed_values_ptr);
 					}
 					else if (n_loc_bases == 10)
@@ -756,7 +721,8 @@ namespace polyfem
 																					  size(),
 																					  lambda,
 																					  mu,
-																					  mapping,
+																					  //	  mapping,
+																					  second_cache,
 																					  computed_values_ptr);
 					}
 					else if (n_loc_bases == 20)
@@ -775,7 +741,8 @@ namespace polyfem
 																					  size(),
 																					  lambda,
 																					  mu,
-																					  mapping,
+																					  //	  mapping,
+																					  second_cache,
 																					  computed_values_ptr);
 					}
 				}

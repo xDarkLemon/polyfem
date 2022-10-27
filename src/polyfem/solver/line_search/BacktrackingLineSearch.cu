@@ -1,7 +1,5 @@
 #pragma once
 
-// #include "LineSearch.hpp"
-
 // #include <polyfem/utils/Logger.hpp>
 // #include <polyfem/utils/Timer.hpp>
 
@@ -14,11 +12,6 @@
 #include <cuda_runtime_api.h>
 #include "polyfem/utils/CUDA_utilities.cuh"
 #include "cublas_v2.h"
-
-// #include <thrust/host_vector.h>
-// #include <thrust/device_vector.h>
-// #include <thrust/copy.h>
-// #include <thrust/inner_product.h>
 
 #include <cfenv>
 
@@ -41,17 +34,13 @@ namespace polyfem
 				double step_size = starting_step_size;
 
                 TVector grad(x.rows());
-                objFunc.gradient(x, grad);
-                const bool use_grad_norm = grad.norm() < this->use_grad_norm_tol;  // NonlinearSolver json parameter, init to -1 in LineSearch
+                {
+                    POLYFEM_SCOPED_TIMER("compute grad in LS", this->compute_grad_time);
+                    objFunc.gradient(x, grad);
+                }
 
-                const double old_energy = use_grad_norm ? grad.squaredNorm() : old_energy_in;
-                
-                // move data to gpu
                 const int N = x.rows();
                 double *x_dev, *delta_x_dev, *grad_dev, *new_x_dev;
-                double *grad_host = grad.data();
-                const double *x_host = x.data();
-                const double *delta_x_host = delta_x.data();
                 double *new_x_host = new double[N];
 
                 grad_dev = ALLOCATE_GPU<double>(grad_dev, N*sizeof(double));
@@ -59,13 +48,31 @@ namespace polyfem
                 x_dev = ALLOCATE_GPU<double>(x_dev, N*sizeof(double));
                 delta_x_dev = ALLOCATE_GPU<double>(delta_x_dev, N*sizeof(double));
 
-                COPYDATATOGPU<double>(grad_dev, grad_host, N*sizeof(double));
-                cudaMemset(new_x_dev, 0, N*sizeof(double));
-                COPYDATATOGPU<double>(x_dev, x_host, N*sizeof(double));
-                COPYDATATOGPU<double>(delta_x_dev, delta_x_host, N*sizeof(double));
+                {
+                    POLYFEM_SCOPED_TIMER("move data between device and host in LS", this->move_data_time);
+                    COPYDATATOGPU<double>(grad_dev, grad.data(), N*sizeof(double));
+                    COPYDATATOGPU<double>(new_x_dev, x.data(), N*sizeof(double));
+                    COPYDATATOGPU<double>(x_dev, x.data(), N*sizeof(double));
+                    COPYDATATOGPU<double>(delta_x_dev, delta_x.data(), N*sizeof(double));
+                }
 
                 cublasHandle_t handle;
                 cublasCreate(&handle);
+
+                bool use_grad_norm;
+                double old_energy;
+                {
+                    POLYFEM_SCOPED_TIMER("compute grad norm in LS", this->compute_grad_norm_time);
+                    // use_grad_norm = grad.norm() < this->use_grad_norm_tol;  // NonlinearSolver json parameter, init to -1 in LineSearch
+                    // old_energy = use_grad_norm ? grad.squaredNorm() : old_energy_in;
+                    double grad_norm;
+                    cublasDnrm2(handle, N, grad_dev, 1, &grad_norm);
+                    use_grad_norm = grad_norm < this->use_grad_norm_tol; 
+                    if(use_grad_norm==true)
+                        cublasDdot(handle, N, grad_dev, 1, grad_dev, 1, &old_energy);
+                    else
+                        old_energy=old_energy_in;
+                }
 
                 // Find step that reduces the energy
                 double cur_energy = std::nan("");
@@ -75,30 +82,54 @@ namespace polyfem
                     this->iterations++;
 
                     // TVector new_x = x + step_size * delta_x;
-
-                    COPYDATATOGPU<double>(new_x_dev, x_host, N*sizeof(double));
-                    cublasDaxpy(handle, N, &step_size, delta_x_dev, 1, new_x_dev, 1);
-                    COPYDATATOHOST<double>(new_x_host, new_x_dev, N*sizeof(double));
+					{
+                        POLYFEM_SCOPED_TIMER("move data between device and host in LS", this->move_data_time);
+                        cudaMemcpy(new_x_dev, x_dev, N*sizeof(double), cudaMemcpyDeviceToDevice);
+                    }
+                    {
+                        POLYFEM_SCOPED_TIMER("compute new_x in LS", this->compute_new_x_time);
+                        cublasDaxpy(handle, N, &step_size, delta_x_dev, 1, new_x_dev, 1);
+                    }
+                    {
+                        POLYFEM_SCOPED_TIMER("move data between device and host in LS", this->move_data_time);
+                        COPYDATATOHOST<double>(new_x_host, new_x_dev, N*sizeof(double));
+                    }
                     Eigen::Matrix<double, -1, 1> new_x(Eigen::Map<Eigen::Matrix<double, -1, 1>>(new_x_host,N));
 
                     {
                         POLYFEM_SCOPED_TIMER("constraint set update in LS", this->constraint_set_update_time);
                         objFunc.solution_changed(new_x);
-                        // new_x_host = new_x.data();
                     }
 
-                    if (use_grad_norm)
                     {
-                        objFunc.gradient(new_x, grad);
-                        // cur_energy = grad.squaredNorm();
-                        grad_host = grad.data();
-                        COPYDATATOGPU<double>(grad_dev, grad_host, N*sizeof(double));
-                        cublasDdot(handle, N, grad_dev, 1, grad_dev, 1, &cur_energy);
+                        POLYFEM_SCOPED_TIMER("compute grad/value in LS", this->compute_grad_or_value_time);
+                        if (use_grad_norm)
+                        {
+                            {
+                                POLYFEM_SCOPED_TIMER("compute grad in LS", this->compute_grad_time);
+                                objFunc.gradient(new_x, grad);
+                            }
+                            // cur_energy = grad.squaredNorm();
+                            {
+                                POLYFEM_SCOPED_TIMER("move data between device and host in LS", this->move_data_time);
+                                COPYDATATOGPU<double>(grad_dev, grad.data(), N*sizeof(double));
+                            }
+                            {
+                                POLYFEM_SCOPED_TIMER("compute grad norm in LS", this->compute_grad_norm_time);
+                                cublasDdot(handle, N, grad_dev, 1, grad_dev, 1, &cur_energy);
+                            }
+                        }
+                        else
+                        {
+                            POLYFEM_SCOPED_TIMER("compute value in LS", this->compute_value_time);
+                            cur_energy = objFunc.value(new_x);
+                        }
                     }
-                    else
-                        cur_energy = objFunc.value(new_x);
 
-                    is_step_valid = objFunc.is_step_valid(x, new_x);
+                    {
+                        POLYFEM_SCOPED_TIMER("is step valid in LS", this->is_step_valid_time);
+                        is_step_valid = objFunc.is_step_valid(x, new_x);
+                    }
 			        // TVector grad = TVector::Zero(objFunc.reduced_size);
 			        // gradient(new_x, grad, true);
 

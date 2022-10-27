@@ -35,6 +35,8 @@ namespace cppoptlib
 			const Eigen::Matrix<double, -1, 1> &grad,
 			const Eigen::Matrix<double, -1, 1> &direction)
 	{
+		POLYFEM_SCOPED_TIMER("check direction", this->check_direction_time);
+
         int N = hessian.cols();
         
         double *hessian_dev, *direction_dev, *grad_dev, *tmp_dev, *residual_dev;  // to compute residual

@@ -160,6 +160,7 @@ namespace cppoptlib
 	bool SparseNewtonDescentSolver<ProblemType>::check_direction(
 		const polyfem::StiffnessMatrix &hessian, const TVector &grad, const TVector &direction)
 	{
+		POLYFEM_SCOPED_TIMER("check direction", this->check_direction_time);
 		// gradient descent, check descent direction
 		const double residual = (hessian * direction + grad).norm(); // H Δx + g = 0
 		if (std::isnan(residual) || residual > std::max(1e-8 * grad.norm(), 1e-5))

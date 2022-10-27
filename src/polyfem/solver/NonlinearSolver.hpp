@@ -89,6 +89,8 @@ namespace cppoptlib
 		double line_search_time;
 		double constraint_set_update_time;
 		double obj_fun_time;
+		double grad_norm_time;
+		double check_direction_time;
 
 		ErrorCode m_error_code;
 

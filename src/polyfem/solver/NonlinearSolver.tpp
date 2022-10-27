@@ -312,6 +312,7 @@ namespace cppoptlib
 		line_search_time = 0;
 		obj_fun_time = 0;
 		constraint_set_update_time = 0;
+		check_direction_time = 0;  //
 		if (m_line_search)
 		{
 			m_line_search->reset_times();
@@ -343,6 +344,7 @@ namespace cppoptlib
 		solver_info["time_line_search"] = line_search_time / per_iteration;
 		solver_info["time_constraint_set_update"] = constraint_set_update_time / per_iteration;
 		solver_info["time_obj_fun"] = obj_fun_time / per_iteration;
+		solver_info["time_check_direction"] = check_direction_time / per_iteration;
 
 		if (m_line_search)
 		{
@@ -360,6 +362,13 @@ namespace cppoptlib
 				/ per_iteration;
 			solver_info["time_line_search_constraint_set_update"] =
 				m_line_search->constraint_set_update_time / per_iteration;
+			solver_info["time_line_search_grad_norm"] = m_line_search->compute_grad_norm_time / per_iteration;
+			solver_info["time_line_search_grad"] =  m_line_search->compute_grad_time / per_iteration;
+			solver_info["time_line_search_value"] =  m_line_search->compute_value_time / per_iteration;
+			solver_info["time_line_search_grad_or_value"] =  m_line_search->compute_grad_or_value_time / per_iteration;
+			solver_info["time_line_search_is_step_valid"] =  m_line_search->is_step_valid_time / per_iteration;
+			solver_info["time_line_search_new_x"] =  m_line_search->compute_new_x_time / per_iteration;
+			solver_info["time_line_search_move_data"] =  m_line_search->move_data_time / per_iteration;
 		}
 	}
 
@@ -371,11 +380,13 @@ namespace cppoptlib
 			"line_search {:.3g}s, constraint_set_update {:.3g}s, "
 			"obj_fun {:.3g}s, checking_for_nan_inf {:.3g}s, "
 			"broad_phase_ccd {:.3g}s, ccd {:.3g}s, "
-			"classical_line_search {:.3g}s",
-			grad_time, assembly_time, inverting_time, checking_direction_time, line_search_time,
+			"classical_line_search {:.3g}s, "
+			"check_direction {:.3g}s ",
+			grad_time, assembly_time, inverting_time, line_search_time,
 			constraint_set_update_time + (m_line_search ? m_line_search->constraint_set_update_time : 0),
 			obj_fun_time, m_line_search ? m_line_search->checking_for_nan_inf_time : 0,
 			m_line_search ? m_line_search->broad_phase_ccd_time : 0, m_line_search ? m_line_search->ccd_time : 0,
-			m_line_search ? m_line_search->classical_line_search_time : 0);
+			m_line_search ? m_line_search->classical_line_search_time : 0,
+			check_direction_time);
 	}
 } // namespace cppoptlib

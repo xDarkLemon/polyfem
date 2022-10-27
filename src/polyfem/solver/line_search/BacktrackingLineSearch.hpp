@@ -41,7 +41,10 @@ namespace polyfem
 
 						this->cur_iter = 0;
 
-						old_energy = objFunc.value(x);
+						{
+							POLYFEM_SCOPED_TIMER("compute value in LS", this->compute_value_time);
+							old_energy = objFunc.value(x);
+						}
 						if (std::isnan(old_energy))
 						{
 							logger().error("Original energy in line search is nan!");
@@ -152,11 +155,18 @@ namespace polyfem
 					double step_size = starting_step_size;
 
 					TVector grad(x.rows());
-					objFunc.gradient(x, grad);
-					const bool use_grad_norm = grad.norm() < this->use_grad_norm_tol;
+					{
+						POLYFEM_SCOPED_TIMER("compute grad in LS", this->compute_grad_time);
+						objFunc.gradient(x, grad);
+					}
 
-					const double old_energy = use_grad_norm ? grad.squaredNorm() : old_energy_in;
-
+					bool use_grad_norm;
+					double old_energy;
+					{
+						POLYFEM_SCOPED_TIMER("compute grad norm in LS", this->compute_grad_norm_time);
+						use_grad_norm = grad.norm() < this->use_grad_norm_tol;
+						old_energy = use_grad_norm ? grad.squaredNorm() : old_energy_in;
+					}
 					// Find step that reduces the energy
 					double cur_energy = std::nan("");
 					bool is_step_valid = false;
@@ -164,27 +174,44 @@ namespace polyfem
 					{
 						this->iterations++;
 
-						TVector new_x = x + step_size * delta_x;
-
+						TVector new_x;
+						{
+							POLYFEM_SCOPED_TIMER("compute new_x in LS", this->compute_new_x_time);
+							new_x = x + step_size * delta_x;
+						}
 						{
 							POLYFEM_SCOPED_TIMER("constraint set update in LS", this->constraint_set_update_time);
 							objFunc.solution_changed(new_x);
 						}
 
 						timerg.start();
-						if (use_grad_norm)
 						{
-							objFunc.gradient(new_x, grad);
-							cur_energy = grad.squaredNorm();
+							POLYFEM_SCOPED_TIMER("compute grad/value in LS", this->compute_grad_or_value_time);
+							if (use_grad_norm)
+							{
+								{
+									POLYFEM_SCOPED_TIMER("compute grad in LS", this->compute_grad_time);
+									objFunc.gradient(new_x, grad);
+								}
+								{
+									POLYFEM_SCOPED_TIMER("compute grad norm in LS", this->compute_grad_norm_time);
+									cur_energy = grad.squaredNorm();
+								}
+							}
+							else
+							{
+								POLYFEM_SCOPED_TIMER("compute value in LS", this->compute_value_time);
+								cur_energy = objFunc.value(new_x);
+							}
 						}
-						else
-							cur_energy = objFunc.value(new_x);
-
 						timerg.stop();
 						logger().trace("done obj.value/grad for LS {}s...", timerg.getElapsedTime());
 
 						timerg.start();
-						is_step_valid = objFunc.is_step_valid(x, new_x);
+						{
+							POLYFEM_SCOPED_TIMER("is step valid in LS", this->is_step_valid_time);
+							is_step_valid = objFunc.is_step_valid(x, new_x);
+						}
 						timerg.stop();
 						logger().trace("done is_step_valid for LS {}s...", timerg.getElapsedTime());
 

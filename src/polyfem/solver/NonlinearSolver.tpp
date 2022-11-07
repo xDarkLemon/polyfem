@@ -90,6 +90,15 @@ namespace cppoptlib
 
 		m_line_search->use_grad_norm_tol = use_grad_norm_tol;
 
+#ifdef USE_NONLINEAR_GPU
+		// move data to gpu
+		const int N = x.rows();
+		m_line_search->x_dev = ALLOCATE_GPU<double>(m_line_search->x_dev, N*sizeof(double));
+		m_line_search->delta_x_dev = ALLOCATE_GPU<double>(m_line_search->delta_x_dev, N*sizeof(double));
+		COPYDATATOGPU<double>(m_line_search->x_dev, x.data(), N*sizeof(double));
+		COPYDATATOGPU<double>(m_line_search->delta_x_dev, delta_x.data(), N*sizeof(double));
+#endif
+
 		do
 		{
 			{
@@ -136,7 +145,9 @@ namespace cppoptlib
 				this->m_status = Status::Continue;
 				continue;
 			}
-
+#ifdef USE_NONLINEAR_GPU
+            COPYDATATOGPU<double>(m_line_search->delta_x_dev, delta_x.data(), N*sizeof(double));
+#endif
 			if (grad_norm != 0 && delta_x.dot(grad) >= 0)
 			{
 				increase_descent_strategy();
@@ -223,6 +234,10 @@ namespace cppoptlib
 
 		timer.stop();
 
+#ifdef USE_NONLINEAR_GPU
+		cudaFree(m_line_search->x_dev);
+		cudaFree(m_line_search->delta_x_dev);
+#endif
 		// -----------
 		// Log results
 		// -----------

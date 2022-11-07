@@ -62,6 +62,9 @@ namespace polyfem
 				double move_data_time;
 
 				double use_grad_norm_tol = -1;
+				
+				// tmporary pointers for gpu
+				double *x_dev, *delta_x_dev;
 
 			protected:
 				double min_step_size = 0;

@@ -43,17 +43,20 @@ namespace polyfem
                 double *x_dev, *delta_x_dev, *grad_dev, *new_x_dev;
                 double *new_x_host = new double[N];
 
+                x_dev = this->x_dev;
+                delta_x_dev = this->delta_x_dev;
+
                 grad_dev = ALLOCATE_GPU<double>(grad_dev, N*sizeof(double));
                 new_x_dev = ALLOCATE_GPU<double>(new_x_dev, N*sizeof(double));
-                x_dev = ALLOCATE_GPU<double>(x_dev, N*sizeof(double));
-                delta_x_dev = ALLOCATE_GPU<double>(delta_x_dev, N*sizeof(double));
+                // x_dev = ALLOCATE_GPU<double>(x_dev, N*sizeof(double));
+                // delta_x_dev = ALLOCATE_GPU<double>(delta_x_dev, N*sizeof(double));
 
                 {
                     POLYFEM_SCOPED_TIMER("move data between device and host in LS", this->move_data_time);
                     COPYDATATOGPU<double>(grad_dev, grad.data(), N*sizeof(double));
                     COPYDATATOGPU<double>(new_x_dev, x.data(), N*sizeof(double));
-                    COPYDATATOGPU<double>(x_dev, x.data(), N*sizeof(double));
-                    COPYDATATOGPU<double>(delta_x_dev, delta_x.data(), N*sizeof(double));
+                    // COPYDATATOGPU<double>(x_dev, x.data(), N*sizeof(double));
+                    // COPYDATATOGPU<double>(delta_x_dev, delta_x.data(), N*sizeof(double));
                 }
 
                 cublasHandle_t handle;
@@ -159,10 +162,12 @@ namespace polyfem
                     return std::nan("");
                 }
 
+                cudaMemcpy(this->x_dev, new_x_dev, N*sizeof(double), cudaMemcpyDeviceToDevice);
+
                 cudaFree(grad_dev);
                 cudaFree(new_x_dev);
-                cudaFree(x_dev);
-                cudaFree(delta_x_dev);
+                // cudaFree(x_dev);
+                // cudaFree(delta_x_dev);
                 cublasDestroy(handle);
 
                 return step_size;

@@ -160,9 +160,9 @@ namespace polyfem
 		*/
 		if (n_elements > 5000)
 		{
-			cudaDeviceSetLimit(cudaLimitMallocHeapSize, sizeLimit * 4);
-			cudaDeviceGetLimit(&sizeLimit, cudaLimitMallocHeapSize);
-			std::cout << "Current device heap sizeLimit: " << sizeLimit << std::endl;
+			//	cudaDeviceSetLimit(cudaLimitMallocHeapSize, sizeLimit * 4);
+			//	cudaDeviceGetLimit(&sizeLimit, cudaLimitMallocHeapSize);
+			//	std::cout << "Current device heap sizeLimit: " << sizeLimit << std::endl;
 		}
 	}
 

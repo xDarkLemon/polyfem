@@ -98,7 +98,6 @@ option(POLYSOLVE_WITH_UMFPACK "Enable UmfPack library" ON)
 option(POLYSOLVE_WITH_SUPERLU "Enable SuperLU library" ON)
 option(POLYSOLVE_WITH_MKL "Enable MKL library" ON)
 option(POLYSOLVE_WITH_PARDISO "Enable Pardiso library" ON)
-option(POLYSOLVE_WITH_CUDA "Enable CUDA" OFF)
 option(POLYSOLVE_WITH_HYPRE "Enable hypre" OFF)
 option(POLYSOLVE_WITH_AMGCL "Use AMGCL" ON)
 option(POLYSOLVE_WITH_SPECTRA "Enable computing spectrum" OFF)
@@ -131,19 +130,20 @@ option(LIBIGL_WITH_VIEWER "Use OpenGL viewer" OFF)
 option(LIBIGL_WITH_XML "Use XML" OFF)
 option(LIBIGL_WITH_TETGEN "Use Tetgen" OFF)
 
-set(WITH_GPU ON)
+set(WITH_GPU OFF)
 
 if(WITH_GPU)
+    option(POLYSOLVE_WITH_CUDA "Enable CUDA" ON)
     message(STATUS "USING GPU")
     add_definitions(-DUSE_GPU)
+
+    set(USE_NONLINEAR_GPU OFF)
+
+    if(USE_NONLINEAR_GPU)
+        add_definitions(-DUSE_NONLINEAR_GPU)
+    endif()
 else()
     message(STATUS "NOT USING GPU")
-endif()
-
-set(USE_NONLINEAR_GPU ON)
-
-if(USE_NONLINEAR_GPU)
-    add_definitions(-DUSE_NONLINEAR_GPU)
 endif()
 
 # ###############################################################################

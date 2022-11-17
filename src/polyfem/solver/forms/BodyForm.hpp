@@ -18,6 +18,24 @@ namespace polyfem::solver
 		/// @param state Reference to the simulation state
 		/// @param rhs_assembler Reference to the right hand side assembler
 		/// @param apply_DBC If true, set the Dirichlet boundary conditions in the RHS
+
+#ifdef USE_GPU
+		BodyForm(const int ndof,
+				 const int n_pressure_bases,
+				 const std::vector<int> &boundary_nodes,
+				 const std::vector<mesh::LocalBoundary> &local_boundary,
+				 const std::vector<mesh::LocalBoundary> &local_neumann_boundary,
+				 const int n_boundary_samples,
+				 const Eigen::MatrixXd &rhs,
+				 const assembler::RhsAssembler &rhs_assembler,
+				 const Density &density,
+				 const bool apply_DBC,
+				 const bool is_formulation_mixed,
+				 const bool is_time_dependent,
+				 DATA_POINTERS_GPU &data_gpu);
+#endif
+
+#ifndef USE_GPU
 		BodyForm(const int ndof,
 				 const int n_pressure_bases,
 				 const std::vector<int> &boundary_nodes,
@@ -30,7 +48,7 @@ namespace polyfem::solver
 				 const bool apply_DBC,
 				 const bool is_formulation_mixed,
 				 const bool is_time_dependent);
-
+#endif
 	protected:
 		/// @brief Compute the value of the body force form
 		/// @param x Current solution
@@ -77,6 +95,9 @@ namespace polyfem::solver
 		const int ndof_; ///< Number of degrees of freedom
 		const int n_pressure_bases_;
 
+#ifdef USE_GPU
+		const DATA_POINTERS_GPU &data_gpu_;
+#endif
 		bool apply_DBC_; ///< If true, set the Dirichlet boundary conditions in the RHS
 
 		const Eigen::MatrixXd &rhs_;  ///< static RHS for the current time

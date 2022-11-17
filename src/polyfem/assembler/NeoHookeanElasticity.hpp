@@ -34,7 +34,8 @@ namespace polyfem::assembler
 		// energy, gradient, and hessian used in newton method
 		Eigen::MatrixXd assemble_hessian(const NonLinearAssemblerData &data) const;
 		Eigen::VectorXd assemble_grad(const NonLinearAssemblerData &data) const;
-
+		double compute_energy(const NonLinearAssemblerData &data) const;
+#ifdef USE_GPU
 		std::vector<double> assemble_hessian_GPU(double *displacement_dev_ptr,
 												 Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, 0, 3, 3> *jac_it_dev_ptr,
 												 basis::Local2Global_GPU *global_data_dev_ptr,
@@ -66,8 +67,6 @@ namespace polyfem::assembler
 										  //					   double *val_grad_ptr, int n_basis) const;
 										  int n_basis) const;
 
-		double compute_energy(const NonLinearAssemblerData &data) const;
-
 		double compute_energy_gpu(double *displacement_dev_ptr,
 								  Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, 0, 3, 3> *jac_it_dev_ptr,
 								  basis::Local2Global_GPU *global_data_dev_ptr,
@@ -80,7 +79,7 @@ namespace polyfem::assembler
 								  double *lambda_ptr,
 								  double *mu_ptr) const;
 		//					   double *energy_storage) const;
-
+#endif
 		// rhs for fabbricated solution, compute with automatic sympy code
 		Eigen::Matrix<double, Eigen::Dynamic, 1, 0, 3, 1>
 		compute_rhs(const AutodiffHessianPt &pt) const;

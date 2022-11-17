@@ -148,7 +148,17 @@ TEST_CASE("body form derivatives", "[form][form_derivatives][body_form]")
 	const auto rhs_assembler_ptr = state_ptr->build_rhs_assembler();
 	const bool apply_DBC = false; // GENERATE(true, false);
 	const int ndof = state_ptr->n_bases * state_ptr->mesh->dimension();
-
+#ifdef USE_GPU
+	BodyForm form(ndof, state_ptr->n_pressure_bases,
+				  state_ptr->boundary_nodes,
+				  state_ptr->local_boundary,
+				  state_ptr->local_neumann_boundary, state_ptr->n_boundary_samples(),
+				  state_ptr->rhs,
+				  *rhs_assembler_ptr,
+				  state_ptr->assembler.density(),
+				  apply_DBC, false, state_ptr->problem->is_time_dependent(), state_ptr->data_gpu_);
+#endif
+#ifndef USE_GPU
 	BodyForm form(ndof, state_ptr->n_pressure_bases,
 				  state_ptr->boundary_nodes,
 				  state_ptr->local_boundary,
@@ -157,8 +167,8 @@ TEST_CASE("body form derivatives", "[form][form_derivatives][body_form]")
 				  *rhs_assembler_ptr,
 				  state_ptr->assembler.density(),
 				  apply_DBC, false, state_ptr->problem->is_time_dependent());
+#endif
 	form.update_quantities(state_ptr->args["time"]["t0"].get<double>(), Eigen::VectorXd());
-
 	CAPTURE(apply_DBC);
 	test_form(form, *state_ptr);
 }

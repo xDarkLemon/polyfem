@@ -273,6 +273,7 @@ namespace polyfem
 			}
 		}
 
+		// Missing implementation for dynamic number of basis
 		template <int n_basis, int dim>
 		__global__ void compute_energy_hessian_aux_fast_GPU(int it_index,
 															double *displacement,
@@ -371,7 +372,8 @@ namespace polyfem
 						delJ_delF.col(0) = kernel_cross<dim>(v, w);
 						delJ_delF.col(1) = kernel_cross<dim>(w, u);
 						delJ_delF.col(2) = kernel_cross<dim>(u, v);
-						// CHECK BLOCK TEMPLATE BEHAVIOUR IN CUDA KERNEL
+
+						// PASSED TESTS FOR N_BASIS = 4 , 10
 						del2J_delF2.template block<dim, dim>(0, 6) = kernel_hat<dim>(v);
 						del2J_delF2.template block<dim, dim>(6, 0) = -kernel_hat<dim>(v);
 						del2J_delF2.template block<dim, dim>(0, 3) = -kernel_hat<dim>(w);

@@ -37,12 +37,6 @@ namespace polyfem
 			}
 		};
 
-		class Local2Global_GPU
-		{
-		public:
-			int index;  ///< global index of the actual node
-			double val; ///< weight
-		};	
 		///
 		/// @brief      Represents one basis function and its gradient.
 		///
@@ -93,18 +87,18 @@ namespace polyfem
 				grad_(uv, val);
 			}
 
-			//list of local to global mappings
+			// list of local to global mappings
 			inline const std::vector<Local2Global> &global() const { return global_; }
 			inline std::vector<Local2Global> &global() { return global_; }
 
-			//setting the basis lambda and its gradint
+			// setting the basis lambda and its gradint
 			inline void set_basis(const Fun &fun) { basis_ = fun; }
 			inline void set_grad(const Fun &fun) { grad_ = fun; }
 
 			inline bool is_defined() const { return (basis_ ? true : false); }
 			inline int order() const { return order_; }
 
-			//output
+			// output
 			friend std::ostream &operator<<(std::ostream &os, const Basis &obj)
 			{
 				os << obj.local_index_ << ":\n";

@@ -181,18 +181,31 @@ namespace polyfem
 		Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, 0, 3, 3> *jac_it_dev_ptr = nullptr;
 		basis::Local2Global_GPU *global_data_dev_ptr = nullptr;
 		Eigen::Matrix<double, -1, 1, 0, 3, 1> *da_dev_ptr = nullptr;
+		Eigen::Matrix<double, -1, 1, 0, 3, 1> *val_dev_ptr = nullptr;
 		Eigen::Matrix<double, -1, -1, 0, 3, 3> *grad_dev_ptr = nullptr;
+		Eigen::Matrix<double, -1, -1, 0, 3, 3> *forces_dev_ptr = nullptr;
 		double *lambda_ptr = nullptr;
 		double *mu_ptr = nullptr;
+		double *rho_ptr = nullptr;
 
 		n_elements = int(bases.size());
 
 		std::vector<polyfem::assembler::ElementAssemblyValues> vals_array(n_elements);
 
 		auto g_bases = geom_bases();
+
+		Eigen::MatrixXd forces_host;
+		Eigen::Matrix<double, -1, -1, 0, 3, 3> forces_;
+
+		forces_dev_ptr = ALLOCATE_GPU(forces_dev_ptr, sizeof(Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, 0, 3, 3>) * n_elements);
+
 		for (int e = 0; e < n_elements; ++e)
 		{
 			ass_vals_cache.compute(e, is_vol_, bases[e], g_bases[e], vals_array[e]);
+			// to do: check if parameter t = 0 will affect the forces variable;
+			(problem.get())->rhs(assembler, formulation(), vals_array[e].val, 0, forces_host);
+			forces_ = Eigen::Map<Eigen::Matrix<double, -1, -1, 0, 3, 3>>(forces_host.data(), 3, 3);
+			COPYDATATOGPU(forces_dev_ptr + e, &forces_, sizeof(Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, 0, 3, 3>));
 		}
 
 		logger().info("Finished computing cache for GPU");
@@ -200,7 +213,6 @@ namespace polyfem
 		n_loc_bases = vals_array[0].basis_values.size();
 		global_vector_size = vals_array[0].basis_values[0].global.size();
 
-		int check_size_1 = sizeof(Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, 0, 3, 3>);
 		jac_it_dev_ptr = ALLOCATE_GPU(jac_it_dev_ptr, sizeof(Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, 0, 3, 3>) * n_elements * jac_it_size);
 
 		std::vector<basis::Local2Global_GPU> global_data_host(n_elements * n_loc_bases * global_vector_size);
@@ -232,20 +244,24 @@ namespace polyfem
 
 		n_pts = da_host[0].size();
 
-		grad_dev_ptr = ALLOCATE_GPU(grad_dev_ptr, sizeof(Eigen::Matrix<double, -1, -1, 0, 3, 3>) * n_elements * n_loc_bases * n_pts);
+		grad_dev_ptr = ALLOCATE_GPU(grad_dev_ptr, sizeof(Eigen::Matrix<double, -1, -1, 0, 3, 3>) * n_elements * n_loc_bases);
+		val_dev_ptr = ALLOCATE_GPU(val_dev_ptr, sizeof(Eigen::Matrix<double, -1, -1, 0, 3, 1>) * n_elements * n_loc_bases);
 
 		for (int e = 0; e < n_elements; ++e)
 		{
 			for (int f = 0; f < n_loc_bases; f++)
 			{
 				Eigen::Matrix<double, -1, -1, 0, 3, 3> row_(Eigen::Map<Eigen::Matrix<double, -1, -1, 0, 3, 3>>(vals_array[e].basis_values[f].grad.data(), 3, 3));
+				Eigen::Matrix<double, -1, 1, 0, 3, 1> val_ = vals_array[e].basis_values[f].val;
 				COPYDATATOGPU(grad_dev_ptr + e * n_loc_bases + f, &row_, sizeof(Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, 0, 3, 3>));
+				COPYDATATOGPU(val_dev_ptr + e * n_loc_bases + f, &val_, sizeof(Eigen::Matrix<double, Eigen::Dynamic, 1, 0, 3, 1>));
 			}
 		}
 
-		double lambda, mu;
+		double lambda, mu, rho;
 		lambda_ptr = ALLOCATE_GPU(lambda_ptr, sizeof(double) * n_elements * n_pts);
 		mu_ptr = ALLOCATE_GPU(mu_ptr, sizeof(double) * n_elements * n_pts);
+		rho_ptr = ALLOCATE_GPU(rho_ptr, sizeof(double) * n_elements * n_pts);
 
 		for (int e = 0; e < n_elements; ++e)
 		{
@@ -253,8 +269,10 @@ namespace polyfem
 			{
 				// params_tmp_.lambda_mu(vals_array[e].quadrature.points.row(p), vals_array[e].val.row(p), vals_array[e].element_id, lambda, mu);
 				assembler.lame_params().lambda_mu(vals_array[e].quadrature.points.row(p), vals_array[e].val.row(p), vals_array[e].element_id, lambda, mu);
+				rho = assembler.density()(vals_array[e].quadrature.points.row(p), vals_array[e].val.row(p), vals_array[e].element_id);
 				COPYDATATOGPU(lambda_ptr + e * n_pts + p, &lambda, sizeof(double));
 				COPYDATATOGPU(mu_ptr + e * n_pts + p, &mu, sizeof(double));
+				COPYDATATOGPU(rho_ptr + e * n_pts + p, &rho, sizeof(double));
 			}
 		}
 
@@ -271,9 +289,12 @@ namespace polyfem
 		data_gpu_.jac_it_dev_ptr = jac_it_dev_ptr;
 		data_gpu_.global_data_dev_ptr = global_data_dev_ptr;
 		data_gpu_.da_dev_ptr = da_dev_ptr;
+		data_gpu_.val_dev_ptr = val_dev_ptr;
 		data_gpu_.grad_dev_ptr = grad_dev_ptr;
+		data_gpu_.forces_dev_ptr = forces_dev_ptr;
 		data_gpu_.mu_ptr = mu_ptr;
 		data_gpu_.lambda_ptr = lambda_ptr;
+		data_gpu_.rho_ptr = rho_ptr;
 
 		return;
 	}
@@ -328,12 +349,22 @@ namespace polyfem
 #endif
 		forms.push_back(solve_data.elastic_form);
 
+#ifdef USE_GPU
+		solve_data.body_form = std::make_shared<BodyForm>(
+			ndof, n_pressure_bases,
+			boundary_nodes, local_boundary, local_neumann_boundary, n_boundary_samples(),
+			rhs, *solve_data.rhs_assembler,
+			assembler.density(),
+			/*apply_DBC=*/true, /*is_formulation_mixed=*/false, problem->is_time_dependent(), data_gpu_);
+#endif
+#ifndef USE_GPU
 		solve_data.body_form = std::make_shared<BodyForm>(
 			ndof, n_pressure_bases,
 			boundary_nodes, local_boundary, local_neumann_boundary, n_boundary_samples(),
 			rhs, *solve_data.rhs_assembler,
 			assembler.density(),
 			/*apply_DBC=*/true, /*is_formulation_mixed=*/false, problem->is_time_dependent());
+#endif
 		solve_data.body_form->update_quantities(t, sol);
 		forms.push_back(solve_data.body_form);
 

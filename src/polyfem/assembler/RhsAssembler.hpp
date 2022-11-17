@@ -4,6 +4,15 @@
 #include <polyfem/assembler/AssemblerUtils.hpp>
 #include <polyfem/mesh/Obstacle.hpp>
 
+#ifdef USE_GPU
+#include <thrust/functional.h>
+#include <thrust/reduce.h>
+#include <thrust/device_vector.h>
+#include <thrust/copy.h>
+#include <thrust/host_vector.h>
+#include <polyfem/utils/CUDA_utilities.cuh>
+#endif
+
 #include <polyfem/assembler/Problem.hpp>
 #include <polyfem/mesh/LocalBoundary.hpp>
 #include <polyfem/utils/ElasticityUtils.hpp>
@@ -49,6 +58,9 @@ namespace polyfem
 
 			// compute body energy
 			double compute_energy(const Eigen::MatrixXd &displacement, const std::vector<mesh::LocalBoundary> &local_neumann_boundary, const Density &density, const int resolution, const double t) const;
+#ifdef USE_GPU
+			double compute_energy_GPU(const Eigen::MatrixXd &displacement, const std::vector<mesh::LocalBoundary> &local_neumann_boundary, const int resolution, const double t, const DATA_POINTERS_GPU &data_gpu) const;
+#endif
 			// compute body energy gradient, hessian is zero, rhs is a linear function
 			void compute_energy_grad(const std::vector<mesh::LocalBoundary> &local_boundary, const std::vector<int> &bounday_nodes, const Density &density, const int resolution, const std::vector<mesh::LocalBoundary> &local_neumann_boundary, const Eigen::MatrixXd &final_rhs, const double t, Eigen::MatrixXd &rhs) const;
 

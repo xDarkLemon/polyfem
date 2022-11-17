@@ -2,6 +2,40 @@
 
 namespace polyfem::solver
 {
+
+#ifdef USE_GPU
+	BodyForm::BodyForm(const int ndof,
+					   const int n_pressure_bases,
+					   const std::vector<int> &boundary_nodes,
+					   const std::vector<mesh::LocalBoundary> &local_boundary,
+					   const std::vector<mesh::LocalBoundary> &local_neumann_boundary,
+					   const int n_boundary_samples,
+					   const Eigen::MatrixXd &rhs,
+					   const assembler::RhsAssembler &rhs_assembler,
+					   const Density &density,
+					   const bool apply_DBC,
+					   const bool is_formulation_mixed,
+					   const bool is_time_dependent,
+					   DATA_POINTERS_GPU &data_gpu)
+		: ndof_(ndof),
+		  n_pressure_bases_(n_pressure_bases),
+		  boundary_nodes_(boundary_nodes),
+		  local_boundary_(local_boundary),
+		  local_neumann_boundary_(local_neumann_boundary),
+		  n_boundary_samples_(n_boundary_samples),
+		  rhs_(rhs),
+		  rhs_assembler_(rhs_assembler),
+		  density_(density),
+		  apply_DBC_(apply_DBC),
+		  is_formulation_mixed_(is_formulation_mixed),
+		  data_gpu_(data_gpu)
+	{
+		t_ = 0;
+		if (is_time_dependent)
+			update_current_rhs(Eigen::VectorXd());
+	}
+#endif
+#ifndef USE_GPU
 	BodyForm::BodyForm(const int ndof,
 					   const int n_pressure_bases,
 					   const std::vector<int> &boundary_nodes,
@@ -30,10 +64,16 @@ namespace polyfem::solver
 		if (is_time_dependent)
 			update_current_rhs(Eigen::VectorXd());
 	}
-
+#endif
 	double BodyForm::value_unweighted(const Eigen::VectorXd &x) const
 	{
+#ifdef USE_GPU
+		// return rhs_assembler_.compute_energy(x, local_neumann_boundary_, density_, n_boundary_samples_, t_);
+		return rhs_assembler_.compute_energy_GPU(x, local_neumann_boundary_, n_boundary_samples_, t_, data_gpu_);
+#endif
+#ifndef USE_GPU
 		return rhs_assembler_.compute_energy(x, local_neumann_boundary_, density_, n_boundary_samples_, t_);
+#endif
 	}
 
 	void BodyForm::first_derivative_unweighted(const Eigen::VectorXd &, Eigen::VectorXd &gradv) const

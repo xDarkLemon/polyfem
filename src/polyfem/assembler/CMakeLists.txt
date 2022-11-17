@@ -29,6 +29,7 @@ set(SOURCES
 
 	# OgdenElasticity.cpp
 	# OgdenElasticity.hpp
+	RhsAssembler.cu
 	RhsAssembler.cpp
 	RhsAssembler.hpp
 	SaintVenantElasticity.cpp

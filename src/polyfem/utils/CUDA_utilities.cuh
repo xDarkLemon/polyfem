@@ -92,6 +92,16 @@ void COPYDATATOHOST(T *A, T *d_A, int _size)
 
 namespace polyfem
 {
+	namespace basis
+	{
+		class Local2Global_GPU
+		{
+		public:
+			int index;  ///< global index of the actual node
+			double val; ///< weight
+		};
+	} // namespace basis
+
 	class DATA_POINTERS_GPU
 	{
 	public:
@@ -106,9 +116,12 @@ namespace polyfem
 			jac_it_dev_ptr = nullptr;
 			global_data_dev_ptr = nullptr;
 			da_dev_ptr = nullptr;
+			val_dev_ptr = nullptr;
 			grad_dev_ptr = nullptr;
+			forces_dev_ptr = nullptr;
 			mu_ptr = nullptr;
 			lambda_ptr = nullptr;
+			rho_ptr = nullptr;
 		}
 
 		int n_elements;
@@ -120,9 +133,12 @@ namespace polyfem
 		Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, 0, 3, 3> *jac_it_dev_ptr;
 		basis::Local2Global_GPU *global_data_dev_ptr;
 		Eigen::Matrix<double, -1, 1, 0, 3, 1> *da_dev_ptr;
+		Eigen::Matrix<double, -1, 1, 0, 3, 1> *val_dev_ptr;
 		Eigen::Matrix<double, -1, -1, 0, 3, 3> *grad_dev_ptr;
+		Eigen::Matrix<double, -1, -1, 0, 3, 3> *forces_dev_ptr;
 		double *mu_ptr;
 		double *lambda_ptr;
+		double *rho_ptr;
 	};
 } // namespace polyfem
 

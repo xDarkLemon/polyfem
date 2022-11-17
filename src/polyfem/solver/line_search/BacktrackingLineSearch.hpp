@@ -73,11 +73,22 @@ namespace polyfem
 					// Find collision-free step size
 					// -----------------------------
 
+					TVector new_x;
 					{
-						POLYFEM_SCOPED_TIMER("CCD broad-phase", this->broad_phase_ccd_time);
-						TVector new_x = x + step_size * delta_x;
+						POLYFEM_SCOPED_TIMER("compute new_x in LS", this->compute_new_x_time);
+						new_x = x + step_size * delta_x;
+					}
+
+					{
+						POLYFEM_SCOPED_TIMER("line search begin in LS", this->ls_begin_time);
 						objFunc.line_search_begin(x, new_x);
 					}
+
+					// {
+					// 	POLYFEM_SCOPED_TIMER("CCD broad-phase", this->broad_phase_ccd_time);
+					// 	TVector new_x = x + step_size * delta_x;
+					// 	objFunc.line_search_begin(x, new_x);
+					// }
 
 					{
 						POLYFEM_SCOPED_TIMER("CCD narrow-phase", this->ccd_time);

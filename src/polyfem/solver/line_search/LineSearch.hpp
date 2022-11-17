@@ -45,6 +45,9 @@ namespace polyfem
 					is_step_valid_time = 0;
 					compute_new_x_time = 0;
 					move_data_time = 0;
+					max_step_size_time = 0;
+					ls_begin_time = 0;
+					ls_end_time = 0;
 				}
 
 				int iterations; ///< total number of backtracking iterations done
@@ -60,6 +63,9 @@ namespace polyfem
 				double is_step_valid_time;
 				double compute_new_x_time;
 				double move_data_time;
+				double max_step_size_time;
+				double ls_begin_time;
+				double ls_end_time;
 
 				double use_grad_norm_tol = -1;
 				

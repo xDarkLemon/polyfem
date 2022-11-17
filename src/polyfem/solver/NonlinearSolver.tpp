@@ -384,6 +384,9 @@ namespace cppoptlib
 			solver_info["time_line_search_is_step_valid"] =  m_line_search->is_step_valid_time / per_iteration;
 			solver_info["time_line_search_new_x"] =  m_line_search->compute_new_x_time / per_iteration;
 			solver_info["time_line_search_move_data"] =  m_line_search->move_data_time / per_iteration;
+			solver_info["time_line_search_ls_begin"] =  m_line_search->ls_begin_time / per_iteration;
+			solver_info["time_line_search_ls_end"] =  m_line_search->ls_end_time / per_iteration;
+			solver_info["time_line_search_max_step_size"] =  m_line_search->max_step_size_time / per_iteration;
 		}
 	}
 

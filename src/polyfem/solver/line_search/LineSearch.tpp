@@ -95,20 +95,36 @@ namespace polyfem
 				const double rate)
 			{
 				double step_size = starting_step_size;
-				TVector new_x = x + step_size * delta_x;
+				TVector new_x;
+				{
+					POLYFEM_SCOPED_TIMER("compute new_x in LS", this->compute_new_x_time);					
+					new_x = x + step_size * delta_x;
+				}
 
 				// Find step that does not result in nan or infinite energy
 				while (step_size > min_step_size && cur_iter < max_step_size_iter)
 				{
 					// Compute the new energy value without contacts
 					// TODO: removed only elastic
-					const double energy = objFunc.value(new_x);
-					const bool is_step_valid = objFunc.is_step_valid(x, new_x);
+					double energy;
+					{
+						POLYFEM_SCOPED_TIMER("compute value in LS", this->compute_value_time);
+						energy = objFunc.value(new_x);
+					}
+
+					bool is_step_valid;
+					{
+						POLYFEM_SCOPED_TIMER("is step valid in LS", this->is_step_valid_time);
+						is_step_valid = objFunc.is_step_valid(x, new_x);	
+					}
 
 					if (!std::isfinite(energy) || !is_step_valid)
 					{
 						step_size *= rate;
-						new_x = x + step_size * delta_x;
+						{
+							POLYFEM_SCOPED_TIMER("compute new_x in LS", this->compute_new_x_time);					
+							new_x = x + step_size * delta_x;
+						}
 					}
 					else
 					{
@@ -136,13 +152,22 @@ namespace polyfem
 				const double starting_step_size)
 			{
 				double step_size = starting_step_size;
-				TVector new_x = x + step_size * delta_x;
-
+				TVector new_x;
+				{
+					POLYFEM_SCOPED_TIMER("compute new_x in LS", this->compute_new_x_time);					
+					new_x = x + step_size * delta_x;
+				}
+				
 				// Find step that is collision free
-				double max_step_size = objFunc.max_step_size(x, new_x);
+				double max_step_size;
+				{
+					POLYFEM_SCOPED_TIMER("max step size in LS", this->max_step_size_time);					
+					max_step_size = objFunc.max_step_size(x, new_x);
+				} 
 				if (max_step_size == 0)
 				{
 					logger().error("Line search failed because CCD produced a stepsize of zero!");
+					POLYFEM_SCOPED_TIMER("ls end LS", this->ls_end_time);					
 					objFunc.line_search_end();
 					return std::nan("");
 				}

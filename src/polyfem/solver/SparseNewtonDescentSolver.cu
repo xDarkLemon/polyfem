@@ -3,6 +3,7 @@
 #include "SparseNewtonDescentSolver.hpp"
 
 #include "polyfem/utils/CUDA_utilities.cuh"
+#include "polyfem/utils/CuSparseUtils.cuh"
 
 #include <cuda.h>
 #include <cuda_runtime_api.h>
@@ -13,31 +14,6 @@
 
 namespace cppoptlib
 {
-	void check_cuda_mem()
-	{
-		static int flag_gpu_settings = 0;
-		if (!flag_gpu_settings)
-		{
-			size_t free_bytes = 0, total_bytes = 0;
-			cudaMemGetInfo(&free_bytes, &total_bytes);
-			std::cout << "Mem GPU Free : " << free_bytes << " bytes" << std::endl;
-			std::cout << "Mem GPU Total: " << total_bytes << " bytes" << std::endl;
-			size_t sizeLimit = 0;
-			cudaDeviceGetLimit(&sizeLimit, cudaLimitMallocHeapSize);
-			std::cout << "Original device heap sizeLimit: " << sizeLimit << std::endl;
-			flag_gpu_settings++;
-		}
-	}
-
-	void EigenSparseToCuSparseTranspose(const Eigen::SparseMatrix<double> &mat, int *row, int *col, double *val)
-	{
-		const int num_non0 = mat.nonZeros();
-		const int num_outer = mat.cols() + 1;
-		cudaMemcpy(row, mat.outerIndexPtr(), sizeof(int) * num_outer, cudaMemcpyHostToDevice);
-		cudaMemcpy(col, mat.innerIndexPtr(), sizeof(int) * num_non0, cudaMemcpyHostToDevice);
-		cudaMemcpy(val, mat.valuePtr(), sizeof(double) * num_non0, cudaMemcpyHostToDevice);
-	}
-
 	template <typename ProblemType>
 	bool SparseNewtonDescentSolver<ProblemType>::check_direction_gpu(
 		const polyfem::StiffnessMatrix &hessian,
@@ -53,6 +29,21 @@ namespace cppoptlib
 
 		double *hessian_dev, *direction_dev, *grad_dev, *tmp_dev, *res_dev; // to compute residual
 		double *grad_grad_dev, *grad_direc_dev;                             // to compute grad norm and grad dot direction
+
+		// move hessian to gpu (compressed format)
+		const int non0 = hessian.nonZeros();
+		polyfem::logger().trace("non0: {}, cols: {}, rows: {}, allocating size: {} bytes", non0, hessian.cols(), hessian.rows(), non0 * sizeof(double));
+		int *row_dev, *col_dev;
+		// row_dev = ALLOCATE_GPU<int>(row_dev, (N+1)*sizeof(int));
+		// col_dev = ALLOCATE_GPU<int>(col_dev, non0*sizeof(int));
+		// hessian_dev = ALLOCATE_GPU<double>(hessian_dev, non0*sizeof(double));
+		EigenSparseToCuSparseTranspose(hessian, row_dev, col_dev, hessian_dev);
+
+		// compute residual
+		// const double residual = (hessian * direction + grad).norm(); // H Δx + g = 0
+		tmp_dev = ALLOCATE_GPU<double>(tmp_dev, N * sizeof(double));
+		COPYDATATOGPU<double>(tmp_dev, grad.data(), N * sizeof(double));
+		residual_dev = ALLOCATE_GPU<double>(residual_dev, sizeof(double));
 
 		// double *hessian_host = hessian.valuePtr();
 		const double *direction_host = direction.data();

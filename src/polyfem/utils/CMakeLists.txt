@@ -9,6 +9,7 @@ set(SOURCES
 	CUDA_utilities.cuh
 	ClipperUtils.cpp
 	ClipperUtils.hpp
+	CuSparseUtils.cuh
 	DisableWarnings.hpp
 	EdgeSampler.cpp
 	EdgeSampler.hpp

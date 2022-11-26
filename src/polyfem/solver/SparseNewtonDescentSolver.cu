@@ -8,7 +8,9 @@
 #include <polyfem/solver/NLProblem.hpp>
 #include <polyfem/solver/FullNLProblem.hpp>
 #include <polyfem/solver/SparseNewtonDescentSolver.hpp>
+
 #include "polyfem/utils/CUDA_utilities.cuh"
+#include "polyfem/utils/CuSparseUtils.cuh"
 
 #include <cuda.h>
 #include <cuda_runtime_api.h>
@@ -19,14 +21,14 @@
 
 namespace cppoptlib
 {
-    void EigenSparseToCuSparseTranspose(const Eigen::SparseMatrix<double> &mat, int *row, int *col, double *val)
-    {
-        const int num_non0  = mat.nonZeros();
-        const int num_outer = mat.cols() + 1;
-        cudaMemcpy(row, mat.outerIndexPtr(), sizeof(int) * num_outer, cudaMemcpyHostToDevice);
-        cudaMemcpy(col, mat.innerIndexPtr(), sizeof(int) * num_non0, cudaMemcpyHostToDevice);
-        cudaMemcpy(val, mat.valuePtr(), sizeof(double) * num_non0, cudaMemcpyHostToDevice);
-    }
+    // void EigenSparseToCuSparseTranspose(const Eigen::SparseMatrix<double> &mat, int *row, int *col, double *val)
+    // {
+    //     const int num_non0  = mat.nonZeros();
+    //     const int num_outer = mat.cols() + 1;
+    //     cudaMemcpy(row, mat.outerIndexPtr(), sizeof(int) * num_outer, cudaMemcpyHostToDevice);
+    //     cudaMemcpy(col, mat.innerIndexPtr(), sizeof(int) * num_non0, cudaMemcpyHostToDevice);
+    //     cudaMemcpy(val, mat.valuePtr(), sizeof(double) * num_non0, cudaMemcpyHostToDevice);
+    // }
 
 	template <typename ProblemType>
 	bool SparseNewtonDescentSolver<ProblemType>::check_direction_gpu(
@@ -55,9 +57,9 @@ namespace cppoptlib
         const int non0 = hessian.nonZeros();
         polyfem::logger().trace("non0: {}, cols: {}, rows: {}, allocating size: {} bytes", non0,  hessian.cols(), hessian.rows(), non0*sizeof(double));
         int *row_dev, *col_dev;
-        row_dev = ALLOCATE_GPU<int>(row_dev, (N+1)*sizeof(int));
-        col_dev = ALLOCATE_GPU<int>(col_dev, non0*sizeof(int));
-        hessian_dev = ALLOCATE_GPU<double>(hessian_dev, non0*sizeof(double));
+        // row_dev = ALLOCATE_GPU<int>(row_dev, (N+1)*sizeof(int));
+        // col_dev = ALLOCATE_GPU<int>(col_dev, non0*sizeof(int));
+        // hessian_dev = ALLOCATE_GPU<double>(hessian_dev, non0*sizeof(double));
         EigenSparseToCuSparseTranspose(hessian, row_dev, col_dev, hessian_dev);
         
         // compute residual

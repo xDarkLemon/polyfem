@@ -4,6 +4,7 @@
 
 #include <igl/Timer.h>
 
+#include "polyfem/utils/CUDA_utilities.cuh"
 #include "polyfem/utils/CuSparseUtils.cuh"
 
 namespace polyfem::solver
@@ -132,7 +133,23 @@ namespace polyfem::solver
 			logger().trace("done partial sum hessian -- {}s...", timerg.getElapsedTime());
 		}
 #endif
-#ifdef USE_GPU
+// #ifdef USE_GPU
+		/* another approach */
+		// std::vector<Eigen::SparseMatrix<double>> tmp_all;
+		// for (auto &f : forms_)
+		// {
+		// 	if (!f->enabled())
+		// 		continue;
+		// 	THessian tmp;
+
+		// 	f->second_derivative(x, tmp);
+
+		// 	tmp_all.push_back(tmp);
+		// }
+		// PartialHessianSum(tmp_all, hessian);
+		/* another approach */
+
+		int cnt = 0;
 		for (auto &f : forms_)
 		{
 			if (!f->enabled())
@@ -141,22 +158,42 @@ namespace polyfem::solver
 
 			f->second_derivative(x, tmp);
 
+			// printf("AFTER computing tmp at round %d\n", cnt);
+			// printf("\ntmp eigen matrix:");
+			// printCSRMatrix(tmp.valuePtr(), tmp.outerIndexPtr(), tmp.innerIndexPtr(), tmp.cols(), tmp.nonZeros());
+			// printf("\nhessian eigen matrix:");
+			// printCSRMatrix(hessian.valuePtr(), hessian.outerIndexPtr(), hessian.innerIndexPtr(), hessian.cols(), hessian.nonZeros());
+
 			if (tmp.nonZeros()==0)
 				continue;
 
 			if (!hessian.nonZeros()>0)
 			{
 				hessian = tmp;
+
+				// printf("AFTER copying tmp to hessian\n");
+				// printf("\ntmp eigen matrix:");
+				// printCSRMatrix(tmp.valuePtr(), tmp.outerIndexPtr(), tmp.innerIndexPtr(), tmp.cols(), tmp.nonZeros());
+				// printf("\nhessian eigen matrix:");
+				// printCSRMatrix(hessian.valuePtr(), hessian.outerIndexPtr(), hessian.innerIndexPtr(), hessian.cols(), hessian.nonZeros());
 			}
 			else
 			{
+				// printf("BEFORE CuSparseHessianSum\n");
+				// printf("\ntmp eigen matrix:");
+				// printCSRMatrix(tmp.valuePtr(), tmp.outerIndexPtr(), tmp.innerIndexPtr(), tmp.cols(), tmp.nonZeros());
+				// printf("\nhessian eigen matrix:");
+				// printCSRMatrix(hessian.valuePtr(), hessian.outerIndexPtr(), hessian.innerIndexPtr(), hessian.cols(), hessian.nonZeros());
+				// printf("IN CuSparseHessianSum\n");
+
 				timerg.start();
 				CuSparseHessianSum(tmp, hessian);
 				timerg.stop();
 				logger().trace("done partial sum hessian -- {}s...", timerg.getElapsedTime());
 			}
+			cnt++;
 		}
-#endif
+// #endif
 	}
 
 	void FullNLProblem::solution_changed(const TVector &x)

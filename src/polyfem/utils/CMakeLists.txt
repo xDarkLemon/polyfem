@@ -7,6 +7,7 @@ set(SOURCES
 	BoundarySampler.cpp
 	BoundarySampler.hpp
 	CUDA_utilities.cuh
+	CuSparseUtils.cuh
 	Selection.cpp
 	Selection.hpp
 	DisableWarnings.hpp

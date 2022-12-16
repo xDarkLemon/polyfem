@@ -133,8 +133,13 @@ option(LIBIGL_WITH_TETGEN "Use Tetgen" OFF)
 set(WITH_GPU OFF)
 
 if(WITH_GPU)
-    option(POLYSOLVE_WITH_CUDA "Enable CUDA" ON)
-    message(STATUS "USING GPU")
+    # find_package(MPI)
+
+    # target_link_libraries(polyfem PUBLIC MPI::MPI_CXX)
+    option(POLYSOLVE_WITH_PETSC "Enable PETSC" OFF)
+    option(POLYSOLVE_WITH_CUSOLVER "Enable cuSOLVER library" OFF)
+    option(POLYSOLVE_WITH_CUDA "Enable CUDA" OFF)
+    message(STATUS "Using PolyFEM with CUDA backend")
     add_definitions(-DUSE_GPU)
 
     set(USE_NONLINEAR_GPU OFF)
@@ -143,7 +148,7 @@ if(WITH_GPU)
         add_definitions(-DUSE_NONLINEAR_GPU)
     endif()
 else()
-    message(STATUS "NOT USING GPU")
+    message(STATUS "PolyFEM has not CUDA backend")
 endif()
 
 # ###############################################################################
@@ -384,7 +389,7 @@ endif()
 # CUDA
 # ###############################################################################
 
-# if(1)
+# if(WITH_GPU)
 # Thrust library
 
 # target_include_directories(polyfem PUBLIC ${Thrust_INCLUDE_DIRS})

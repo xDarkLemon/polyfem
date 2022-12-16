@@ -27,6 +27,7 @@ namespace cppoptlib
 
 		void assemble_hessian(ProblemType &objFunc, const TVector &x, polyfem::StiffnessMatrix &hessian);
 		bool solve_linear_system(const polyfem::StiffnessMatrix &hessian, const TVector &grad, TVector &direction);
+		bool solve_linear_system_petsc(polyfem::StiffnessMatrix &hessian, const TVector &grad, TVector &direction);
 		bool check_direction(const polyfem::StiffnessMatrix &hessian, const TVector &grad, const TVector &direction);
 		bool check_direction_gpu(const polyfem::StiffnessMatrix &hessian, const Eigen::Matrix<double, -1, 1> &grad, const Eigen::Matrix<double, -1, 1> &direction);
 

@@ -76,11 +76,16 @@ namespace cppoptlib
 
 		assemble_hessian(objFunc, x, hessian);
 
+#ifdef POLYSOLVE_WITH_PETSC
+		if (!solve_linear_system_petsc(hessian, grad, direction))
+			return compute_update_direction(objFunc, x, grad, direction);
+#else
 		if (!solve_linear_system(hessian, grad, direction))
 			return compute_update_direction(objFunc, x, grad, direction);
+#endif
 
 #ifdef USE_NONLINEAR_GPU
-		if (!check_direction(hessian, grad, direction))
+		if (!check_direction_gpu(hessian, grad, direction))
 			return compute_update_direction(objFunc, x, grad, direction);
 #endif
 #ifndef USE_NONLINEAR_GPU
@@ -156,6 +161,50 @@ namespace cppoptlib
 
 	// =======================================================================
 
+	template <typename ProblemType>
+	bool SparseNewtonDescentSolver<ProblemType>::solve_linear_system_petsc(
+		polyfem::StiffnessMatrix &hessian, const TVector &grad, TVector &direction)
+	{
+		POLYFEM_SCOPED_TIMER("linear solve", this->inverting_time);
+
+		// Initializes linear solver for PETSC
+		// TODO: To create a manager for choosing the external linear solver by using json
+		/*
+		/// @param[in] hessian : Sparse Matrix A
+					   MAT_AIJ : 0 (sequential), 1(CuSPARSE AIJ)
+					   SOLVER_INDEX : see below
+		0 = PARDISO
+		1 = SUPERLU_DIST
+		2 = CHOLMOD
+		3 = MUMPS
+		4 = CUSPARSE
+		5 = STRUMPACK
+		6 = HYPRE // NOT FULLY IMPLEMENTED YET
+		(ANY)DEFAULT = PETSC NATIVE SOLVER
+		*/
+		try
+		{
+			linear_solver->factorize(hessian, 0, 99);
+		}
+		catch (const std::runtime_error &err)
+		{
+			increase_descent_strategy();
+
+			// warn if using gradient descent
+			polyfem::logger().log(
+				log_level(), "Unable to factorize Hessian: \"{}\"; reverting to {}",
+				err.what(), this->descent_strategy_name());
+
+			// polyfem::write_sparse_matrix_csv("problematic_hessian.csv", hessian);
+			return false;
+		}
+
+		linear_solver->solve(-grad, direction); // H Δx = -g
+
+		return true;
+	}
+
+	// =======================================================================
 	template <typename ProblemType>
 	bool SparseNewtonDescentSolver<ProblemType>::check_direction(
 		const polyfem::StiffnessMatrix &hessian, const TVector &grad, const TVector &direction)

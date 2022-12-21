@@ -68,16 +68,28 @@ inline void printCSRMatrixGPU(const double *val, const int *row, const int *col,
 // https://stackoverflow.com/questions/57334742/convert-eigensparsematrix-to-cusparse-and-vice-versa
 inline void EigenSparseToCuSparseTranspose(const Eigen::SparseMatrix<double> &mat, int *&row, int *&col, double *&val)
 {
+	// using namespace polyfem;
+    igl::Timer timerg;
+
 	int num_non0  = mat.nonZeros();
 	int num_outer = mat.cols() + 1;
 
+    timerg.start();
 	row = ALLOCATE_GPU<int>(row, (mat.cols()+1)*sizeof(int));
 	col = ALLOCATE_GPU<int>(col, mat.nonZeros()*sizeof(int));
 	val = ALLOCATE_GPU<double>(val, mat.nonZeros()*sizeof(double));
+    timerg.stop();
+    // logger().trace("CUDA MALLOC TMP {}s", timerg.getElapsedTime());
+    printf("[2022-11-30 04:53:24.274] [polyfem] [trace] [timing] CUDA MALLOC TMP %lfs\n", timerg.getElapsedTime());
 
-	cudaMemcpy(row, mat.outerIndexPtr(), sizeof(int) * num_outer, cudaMemcpyHostToDevice);
+    timerg.start();
+    cudaMemcpy(row, mat.outerIndexPtr(), sizeof(int) * num_outer, cudaMemcpyHostToDevice);
 	cudaMemcpy(col, mat.innerIndexPtr(), sizeof(int) * num_non0, cudaMemcpyHostToDevice);
 	cudaMemcpy(val, mat.valuePtr(), sizeof(double) * num_non0, cudaMemcpyHostToDevice);
+    timerg.stop();
+    // logger().trace("DATA MOVING HTOD {}s", timerg.getElapsedTime());
+    printf("[2022-11-30 04:53:24.274] [polyfem] [trace] [timing] DATA MOVING HTOD %lfs\n", timerg.getElapsedTime());
+	printf("[2022-11-30 04:53:24.274] [polyfem] [trace] [timing] TMP NNZ %ds\n", mat.nonZeros());		
 }
 
 inline void CuSparseTransposeToEigenSparse(
@@ -89,18 +101,35 @@ inline void CuSparseTransposeToEigenSparse(
     const int mat_col,
     Eigen::SparseMatrix<double> &mat)
 {
-  std::vector<int> outer(mat_col + 1);
-  std::vector<int> inner(num_non0);
-  std::vector<double> value(num_non0);
+	// using namespace polyfem;
+    igl::Timer timerg;
 
-  cudaMemcpy(outer.data(), row, sizeof(int) * (mat_col + 1), cudaMemcpyDeviceToHost);
-  cudaMemcpy(inner.data(), col, sizeof(int) * num_non0, cudaMemcpyDeviceToHost);
-  cudaMemcpy(value.data(), val, sizeof(double) * num_non0, cudaMemcpyDeviceToHost);
+    timerg.start();
+    std::vector<int> outer(mat_col + 1);
+    std::vector<int> inner(num_non0);
+    std::vector<double> value(num_non0);
+    timerg.stop();
+    printf("[2022-11-30 04:53:24.274] [polyfem] [trace] [timing] STD VEC %lfs\n", timerg.getElapsedTime());
 
-  Eigen::Map<Eigen::SparseMatrix<double>> mat_map(
-      mat_row, mat_col, num_non0, outer.data(), inner.data(), value.data());
+    timerg.start();
+    cudaMemcpy(outer.data(), row, sizeof(int) * (mat_col + 1), cudaMemcpyDeviceToHost);
+    cudaMemcpy(inner.data(), col, sizeof(int) * num_non0, cudaMemcpyDeviceToHost);
+    cudaMemcpy(value.data(), val, sizeof(double) * num_non0, cudaMemcpyDeviceToHost);
+    timerg.stop();
+    printf("[2022-11-30 04:53:24.274] [polyfem] [trace] [timing] DATA MOVING DTOH %lfs\n", timerg.getElapsedTime());
 
-  mat = mat_map.eval();
+    timerg.start();
+    mat = Eigen::Map<Eigen::SparseMatrix<double>>(mat_row, mat_col, num_non0, outer.data(), inner.data(), value.data());
+    // Eigen::Map<Eigen::SparseMatrix<double>> mat(mat_row, mat_col, num_non0, outer.data(), inner.data(), value.data());
+    timerg.stop();
+    // logger().trace("EIGEN MAP {}s", timerg.getElapsedTime());
+    printf("[2022-11-30 04:53:24.274] [polyfem] [trace] [timing] EIGEN MAP %lfs\n", timerg.getElapsedTime());
+
+    // timerg.start();
+    // mat = mat_map;
+    // mat = mat_map.eval();
+    // timerg.stop();
+    // printf("[2022-11-30 04:53:24.274] [polyfem] [trace] [timing] EIGEN COPY %lfs\n", timerg.getElapsedTime());
 }
 
 inline void CuSparseMatrixAdd(
@@ -169,10 +198,11 @@ inline void CuSparseMatrixAdd(
     }
 }
 
-inline void CuSparseHessianSum(
+inline void CuSparseHessianSum1(
     const Eigen::SparseMatrix<double> &tmp, 
     Eigen::SparseMatrix<double> &hessian)
 {
+	// using namespace polyfem;
     igl::Timer timerg;
 
     double *tmp_val;
@@ -211,7 +241,7 @@ inline void CuSparseHessianSum(
         hessian.nonZeros(), hessian_val, hessian_row, hessian_col,
         new_hessian_nnz, new_hessian_val, new_hessian_row, new_hessian_col);
     timerg.stop();
-    printf("[2022-11-24 10:44:06.870] [polyfem] [debug] [timing] CUSPARSE HESSIAN ADD %lfs\n", timerg.getElapsedTime());
+    // logger().trace("CUSPARSE ADD {}s", timerg.getElapsedTime());
 
     hessian_val = new_hessian_val;
     hessian_row = new_hessian_row;
@@ -232,7 +262,179 @@ inline void CuSparseHessianSum(
     cudaFree(new_hessian_val);
     cudaFree(new_hessian_row);
     cudaFree(new_hessian_col);
+    cudaFree(hessian_val);
+    cudaFree(hessian_row);
+    cudaFree(hessian_col);
     cudaFree(tmp_val);
     cudaFree(tmp_row);
     cudaFree(tmp_col);
+}
+
+inline void CuSparseHessianSum2(
+    const Eigen::SparseMatrix<double> &tmp, 
+    int &hessian_nnz, double *&hessian_val, int *&hessian_row, int *&hessian_col)
+{
+	// using namespace polyfem;
+    igl::Timer timerg;
+
+    double *tmp_val;
+    int *tmp_row, *tmp_col;
+    EigenSparseToCuSparseTranspose(tmp, tmp_row, tmp_col, tmp_val);
+
+    if(DEBUG)
+    {
+        printf("\ntmp eigen matrix:");
+        printCSRMatrix(tmp.valuePtr(), tmp.outerIndexPtr(), tmp.innerIndexPtr(), tmp.cols(), tmp.nonZeros());
+        printf("\ntmp dev matrix:");
+        printCSRMatrixGPU(tmp_val, tmp_row, tmp_col, tmp.cols(), tmp.nonZeros());
+    }
+
+    if(DEBUG)
+    {   
+        printf("\nhessian dev matrix:");
+        printCSRMatrixGPU(hessian_val, hessian_row, hessian_col, tmp.cols(), hessian_nnz);
+    }
+
+    double *new_hessian_val;
+    int *new_hessian_row;
+    int *new_hessian_col;
+    int new_hessian_nnz;
+
+    timerg.start();
+    CuSparseMatrixAdd(
+        tmp.cols(), tmp.cols(),
+        tmp.nonZeros(), tmp_val, tmp_row, tmp_col, 
+        hessian_nnz, hessian_val, hessian_row, hessian_col,
+        new_hessian_nnz, new_hessian_val, new_hessian_row, new_hessian_col);
+    timerg.stop();
+    // logger().trace("CUSPARSE ADD {}s", timerg.getElapsedTime());
+
+    if(DEBUG)
+    {
+        printf("\nUpdated new hessian dev matrix:");
+        printCSRMatrixGPU(new_hessian_val, new_hessian_row, new_hessian_col, tmp.cols(), new_hessian_nnz);
+    }
+
+    hessian_nnz = new_hessian_nnz;
+
+    timerg.start();
+    cudaFree(hessian_row);
+    cudaFree(hessian_col);
+    cudaFree(hessian_val);
+    timerg.stop();
+    // logger().trace("FREE HESSIAN(EVERY) {}s", timerg.getElapsedTime());
+    timerg.start();
+	hessian_row = ALLOCATE_GPU<int>(hessian_row, (tmp.cols()+1)*sizeof(int));
+	hessian_col = ALLOCATE_GPU<int>(hessian_col, hessian_nnz*sizeof(int));
+	hessian_val = ALLOCATE_GPU<double>(hessian_val, hessian_nnz*sizeof(double));
+    timerg.stop();
+    // logger().trace("CUDA MALLOC HESSIAN {}s", timerg.getElapsedTime());
+
+    timerg.start();
+    cudaMemcpy(hessian_row, new_hessian_row, sizeof(int)*(tmp.cols()+1), cudaMemcpyDeviceToDevice);    
+    cudaMemcpy(hessian_col, new_hessian_col, sizeof(int)*hessian_nnz, cudaMemcpyDeviceToDevice);    
+    cudaMemcpy(hessian_val, new_hessian_val, sizeof(double)*hessian_nnz, cudaMemcpyDeviceToDevice);    
+    timerg.stop();
+    // logger().trace("DATA MOVING DTOD {}s", timerg.getElapsedTime());
+
+    if(DEBUG)
+    {
+        printf("\nUpdated hessian dev matrix:");
+        printCSRMatrixGPU(hessian_val, hessian_row, hessian_col, tmp.cols(), hessian_nnz);
+    }
+
+    timerg.start();
+    cudaFree(new_hessian_val);
+    cudaFree(new_hessian_row);
+    cudaFree(new_hessian_col);
+    timerg.stop();
+    // logger().trace("FREE NEW HESSIAN {}s", timerg.getElapsedTime());
+    timerg.start();
+    cudaFree(tmp_val);
+    cudaFree(tmp_row);
+    cudaFree(tmp_col);
+    timerg.stop();
+    // logger().trace("FREE TMP {}s", timerg.getElapsedTime());
+}
+
+inline void CuSparseHessianSum(
+    const Eigen::SparseMatrix<double> &tmp, 
+    int &hessian_nnz, double **hessian_val, int **hessian_row, int **hessian_col)
+{
+	// using namespace polyfem;
+    igl::Timer timerg;
+
+    double *tmp_val;
+    int *tmp_row, *tmp_col;
+    timerg.start();
+    EigenSparseToCuSparseTranspose(tmp, tmp_row, tmp_col, tmp_val);
+    timerg.stop();
+    printf("[2022-11-30 04:53:24.274] [polyfem] [trace] [timing] EIGEN TO CUSPARSE %lfs\n", timerg.getElapsedTime());
+
+    if(DEBUG)
+    {
+        printf("\ntmp eigen matrix:");
+        printCSRMatrix(tmp.valuePtr(), tmp.outerIndexPtr(), tmp.innerIndexPtr(), tmp.cols(), tmp.nonZeros());
+        printf("\ntmp dev matrix:");
+        printCSRMatrixGPU(tmp_val, tmp_row, tmp_col, tmp.cols(), tmp.nonZeros());
+    }
+
+    if(DEBUG)
+    {   
+        printf("\nhessian dev matrix:");
+        printCSRMatrixGPU(*hessian_val, *hessian_row, *hessian_col, tmp.cols(), hessian_nnz);
+    }
+
+    double *new_hessian_val;
+    int *new_hessian_row;
+    int *new_hessian_col;
+    int new_hessian_nnz;
+
+    timerg.start();
+    CuSparseMatrixAdd(
+        tmp.cols(), tmp.cols(),
+        tmp.nonZeros(), tmp_val, tmp_row, tmp_col, 
+        hessian_nnz, *hessian_val, *hessian_row, *hessian_col,
+        new_hessian_nnz, new_hessian_val, new_hessian_row, new_hessian_col);
+    timerg.stop();
+    // logger().trace("CUSPARSE ADD {}s", timerg.getElapsedTime());
+    printf("[2022-11-30 04:53:24.274] [polyfem] [trace] [timing] CUSPARSE ADD %lfs\n", timerg.getElapsedTime());
+
+    if(DEBUG)
+    {
+        printf("\nUpdated new hessian dev matrix:");
+        printCSRMatrixGPU(new_hessian_val, new_hessian_row, new_hessian_col, tmp.cols(), new_hessian_nnz);
+    }
+
+    hessian_nnz = new_hessian_nnz;
+
+    timerg.start();
+    cudaMemcpy(*hessian_row, new_hessian_row, sizeof(int)*(tmp.cols()+1), cudaMemcpyDeviceToDevice);    
+    cudaMemcpy(*hessian_col, new_hessian_col, sizeof(int)*hessian_nnz, cudaMemcpyDeviceToDevice);    
+    cudaMemcpy(*hessian_val, new_hessian_val, sizeof(double)*hessian_nnz, cudaMemcpyDeviceToDevice);      
+    timerg.stop();
+    // logger().trace("DATA MOVING DTOD {}s", timerg.getElapsedTime());
+    printf("[2022-11-30 04:53:24.274] [polyfem] [trace] [timing] DATA MOVING DTOD %lfs\n", timerg.getElapsedTime());
+
+    if(DEBUG)
+    {
+        printf("\nUpdated hessian dev matrix:");
+        printCSRMatrixGPU(*hessian_val, *hessian_row, *hessian_col, tmp.cols(), hessian_nnz);
+    }
+
+    timerg.start();
+    cudaFree(new_hessian_val);
+    cudaFree(new_hessian_row);
+    cudaFree(new_hessian_col);
+    timerg.stop();
+    // logger().trace("FREE NEW HESSIAN {}s", timerg.getElapsedTime());
+    printf("[2022-11-30 04:53:24.274] [polyfem] [trace] [timing] FREE NEW HESSIAN %lfs\n", timerg.getElapsedTime());
+
+    timerg.start();
+    cudaFree(tmp_val);
+    cudaFree(tmp_row);
+    cudaFree(tmp_col);
+    timerg.stop();
+    // logger().trace("FREE TMP {}s", timerg.getElapsedTime());
+    printf("[2022-11-30 04:53:24.274] [polyfem] [trace] [timing] FREE TMP %lfs\n", timerg.getElapsedTime());
 }

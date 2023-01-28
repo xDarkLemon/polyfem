@@ -6,8 +6,6 @@
 
 #include "polyfem/utils/CuSparseUtils.cuh"
 
-#define DEBUG false
-
 namespace polyfem::solver
 {
 	FullNLProblem::FullNLProblem(std::vector<std::shared_ptr<Form>> &forms)
@@ -134,7 +132,6 @@ namespace polyfem::solver
 			hessian += tmp;
 			timerg.stop();
 			logger().trace("done partial sum hessian -- {}s...", timerg.getElapsedTime());
-			printf("[2022-11-30 04:53:24.274] [polyfem] [trace] [timing] CPU HESSIAN SUM TOT %lfs\n", timerg.getElapsedTime());
 		}
 #endif
 #ifdef USE_GPU
@@ -162,8 +159,7 @@ namespace polyfem::solver
 		hessian_col = ALLOCATE_GPU<int>(hessian_col, nnz_max*sizeof(int));
 		hessian_val = ALLOCATE_GPU<double>(hessian_val, nnz_max*sizeof(double));
 		timerg.stop();
-		// logger().trace("CUDA MALLOC HESSIAN {}s", timerg.getElapsedTime());
-		printf("[2022-11-30 04:53:24.274] [polyfem] [trace] [timing] CUDA MALLOC HESSIAN %lfs\n", timerg.getElapsedTime());
+		logger().trace("CUDA MALLOC HESSIAN {}s", timerg.getElapsedTime());
 		if (hessian.nonZeros()>0)
 		{
 			timerg.start();
@@ -171,95 +167,49 @@ namespace polyfem::solver
 			cudaMemcpy(hessian_col, hessian.innerIndexPtr(), sizeof(int) * hessian.nonZeros(), cudaMemcpyHostToDevice);
 			cudaMemcpy(hessian_val, hessian.valuePtr(), sizeof(double) * hessian.nonZeros(), cudaMemcpyHostToDevice);
 			timerg.stop();
-			printf("[2022-11-30 04:53:24.274] [polyfem] [trace] [timing] DATA MOVING HTOD (HESSIAN) %lfs\n", timerg.getElapsedTime());
+			logger().trace("DATA MOVING HTOD (HESSIAN) {}s", timerg.getElapsedTime());
 		}
 
-		// THessian hessian_cpu;
 		for (int i=0; i<cnt; i++)
 		{
 			THessian tmp = all_tmp[i];
-			// if(DEBUG)
-			// {
-			// 	if(i==0) hessian_cpu=tmp;
-			// 	else hessian_cpu+=tmp;
-			// }
 
 			if (tmp.nonZeros()==0)
 				continue;
 
 			if (hessian_nnz==0)
 			{
-				// hessian = tmp;
 				timerg.start();
 				cudaMemcpy(hessian_row, tmp.outerIndexPtr(), sizeof(int) * (tmp.cols()+1), cudaMemcpyHostToDevice);
 				cudaMemcpy(hessian_col, tmp.innerIndexPtr(), sizeof(int) * tmp.nonZeros(), cudaMemcpyHostToDevice);
 				cudaMemcpy(hessian_val, tmp.valuePtr(), sizeof(double) * tmp.nonZeros(), cudaMemcpyHostToDevice);
 				timerg.stop();
-				// logger().trace("DATA MOVING HTOD {}s", timerg.getElapsedTime());
-				printf("[2022-11-30 04:53:24.274] [polyfem] [trace] [timing] DATA MOVING HTOD %lfs\n", timerg.getElapsedTime());
-				printf("[2022-11-30 04:53:24.274] [polyfem] [trace] [timing] TMP NNZ %ds\n", tmp.nonZeros());		
-
+				logger().trace("DATA MOVING HTOD {}s", timerg.getElapsedTime());
 				hessian_nnz = tmp.nonZeros();
-
-				if(DEBUG)
-				{
-					printf("\nAFTER copying: hessian dev matrix:");
-					printCSRMatrixGPU(hessian_val, hessian_row, hessian_col, hessian.cols(), hessian_nnz);
-				}
 			}
 			else
 			{
-				if(DEBUG)
-				{
-					printf("\nBEFORE: hessian dev matrix: hessian_nnz=%d", hessian_nnz);
-					printCSRMatrixGPU(hessian_val, hessian_row, hessian_col, hessian.cols(), hessian_nnz);
-				}
-				
 				timerg.start();
 				CuSparseHessianSum(tmp, hessian_nnz, &hessian_val, &hessian_row, &hessian_col);
 				timerg.stop();
-				printf("[2022-11-30 04:53:24.274] [polyfem] [trace] [timing] CUSP HESSIAN SUM %lfs\n", timerg.getElapsedTime());
-				
-				if(DEBUG)
-				{
-					printf("\nAFTER: hessian dev matrix: hessian_nnz=%d", hessian_nnz);
-					printCSRMatrixGPU(hessian_val, hessian_row, hessian_col, hessian.cols(), hessian_nnz);
-				}
+				logger().trace("CUSP HESSIAN SUM {}s", timerg.getElapsedTime());
 			}
-
-			// if(DEBUG)
-			// {
-			// 	printf("hessian_cpu:\n");
-			// 	printCSRMatrix(hessian_cpu.valuePtr(), hessian_cpu.outerIndexPtr(), hessian_cpu.innerIndexPtr(), hessian_cpu.cols(), hessian_cpu.nonZeros());
-			// }
 		}
 		timerg.start();
 		hessian.reserve(hessian_nnz);     
 		cudaMemcpy(hessian.outerIndexPtr(), hessian_row, sizeof(int) * (hessian.cols() + 1), cudaMemcpyDeviceToHost);
 		cudaMemcpy(hessian.innerIndexPtr(), hessian_col, sizeof(int) * hessian_nnz, cudaMemcpyDeviceToHost);
 		cudaMemcpy(hessian.valuePtr(), hessian_val, sizeof(double) * hessian_nnz, cudaMemcpyDeviceToHost);
-		// CuSparseTransposeToEigenSparse(hessian_row, hessian_col, hessian_val, hessian_nnz, hessian.rows(), hessian.cols(), hessian);
-
-		// if(DEBUG)
-		// {
-		// 	if(comparematrix(hessian.valuePtr(), hessian.outerIndexPtr(), hessian.innerIndexPtr(), hessian.cols(), hessian.nonZeros(),
-		// 		hessian_cpu.valuePtr(), hessian_cpu.outerIndexPtr(), hessian_cpu.innerIndexPtr(), hessian_cpu.cols(), hessian_cpu.nonZeros())) 
-		// 		printf("EQEQ!\n");
-		// }
-			
 		timerg.stop();
-		// printf("[2022-11-30 04:53:24.274] [polyfem] [trace] [timing] DATA MOVING DTOH %lfs\n", timerg.getElapsedTime());		
-		printf("[2022-11-30 04:53:24.274] [polyfem] [trace] [timing] HESSIAN NNZ %ds\n", hessian_nnz);		
+		logger().trace("DATA MOVING DTOH {}s", timerg.getElapsedTime());
 		timerg.start();
 		cudaFree(hessian_val);
 		cudaFree(hessian_row);
 		cudaFree(hessian_col);
 		timerg.stop();
 		timerg2.stop();
-		// logger().trace("FREE HESSIAN(LAST) {}s", timerg.getElapsedTime());
-		// logger().trace("HESSIAN SUM TOT {}s", timerg.getElapsedTime());
-		printf("[2022-11-30 04:53:24.274] [polyfem] [trace] [timing] FREE HESSIAN %lfs\n", timerg.getElapsedTime());
-		printf("[2022-11-30 04:53:24.274] [polyfem] [trace] [timing] HESSIAN SUM TOT %lfs\n", timerg2.getElapsedTime());
+		logger().trace("FREE HESSIAN(LAST) {}s", timerg.getElapsedTime());
+		logger().trace("HESSIAN SUM TOT {}s", timerg.getElapsedTime());
 #endif
 	}
 

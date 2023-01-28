@@ -417,7 +417,7 @@ void polyfem::utils::full_to_reduced_matrix(
 	if (reduced_size == full_size || reduced_size == full.rows())
 	{
 		assert(reduced_size == full.rows() && reduced_size == full.cols());
-		// reduced = full;
+		// reduced = full;  // problematic with partial hessian sum gpu version
 		int* outerptr=const_cast<int *>(full.outerIndexPtr());
 		int* innerptr=const_cast<int *>(full.innerIndexPtr());
 		double* valueptr=const_cast<double *>(full.valuePtr());

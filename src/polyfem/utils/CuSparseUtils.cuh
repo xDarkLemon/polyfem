@@ -12,8 +12,27 @@ using namespace std;
 
 #define DEBUG false
 
-inline void printCSRMatrix(const double *value, const int *outer, const int *inner, const int N, const int nnz)
+inline bool comparematrix(
+    const double *value1, const int *outer1, const int *inner1, int N1, int nnz1,
+    const double *value2, const int *outer2, const int *inner2, int N2, int nnz2)
 {
+    for (int i=0; i<nnz1; i++)
+    {
+        if(*(value1+i) != *(value2+i))
+        {
+            printf("NEQ at %d, v1= %lf, v2=%lf\n",i, *(value1+i), *(value2+i));
+            return false;
+        }
+    }
+    printf("EQ\n");
+    return true;
+}
+
+inline void printCSRMatrix(const double *value, const int *outer, const int *inner, int N, int nnz)
+{
+    // printf("N: %d, nnz: %d\n",N,nnz);
+    // if (N>20) N=20;
+    // if (nnz>100) nnz=100;
     printf("\nouter: ");
     for (int i=0; i<N; i++)
     {
@@ -119,17 +138,29 @@ inline void CuSparseTransposeToEigenSparse(
     printf("[2022-11-30 04:53:24.274] [polyfem] [trace] [timing] DATA MOVING DTOH %lfs\n", timerg.getElapsedTime());
 
     timerg.start();
-    mat = Eigen::Map<Eigen::SparseMatrix<double>>(mat_row, mat_col, num_non0, outer.data(), inner.data(), value.data());
-    // Eigen::Map<Eigen::SparseMatrix<double>> mat(mat_row, mat_col, num_non0, outer.data(), inner.data(), value.data());
+    // mat = Eigen::Map<Eigen::SparseMatrix<double>>(mat_row, mat_col, num_non0, outer.data(), inner.data(), value.data());
+    /// --USE EIGEN-- ///
+    // Eigen::Map<Eigen::SparseMatrix<double>> mat_map(mat_row, mat_col, num_non0, outer.data(), inner.data(), value.data());
+    /// --USE EIGEN-- ///
     timerg.stop();
-    // logger().trace("EIGEN MAP {}s", timerg.getElapsedTime());
     printf("[2022-11-30 04:53:24.274] [polyfem] [trace] [timing] EIGEN MAP %lfs\n", timerg.getElapsedTime());
 
-    // timerg.start();
+    timerg.start();
+    /// --USE EIGEN-- ///
     // mat = mat_map;
+    /// --USE EIGEN-- ///
     // mat = mat_map.eval();
-    // timerg.stop();
-    // printf("[2022-11-30 04:53:24.274] [polyfem] [trace] [timing] EIGEN COPY %lfs\n", timerg.getElapsedTime());
+
+    /// --USE COPY-- ///
+    // Eigen::Map<Eigen::SparseMatrix<double>> mat(mat_row, mat_col, num_non0, outer.data(), inner.data(), value.data());
+    mat.reserve(num_non0);     
+    memcpy(mat.outerIndexPtr(), outer.data(), sizeof(int) * (mat_col + 1));
+    memcpy(mat.innerIndexPtr(), inner.data(), sizeof(int) * num_non0);
+    memcpy(mat.valuePtr(), value.data(), sizeof(double) * num_non0);
+    /// --USE COPY-- ///
+
+    timerg.stop();
+    printf("[2022-11-30 04:53:24.274] [polyfem] [trace] [timing] EIGEN COPY %lfs\n", timerg.getElapsedTime());
 }
 
 inline void CuSparseMatrixAdd(

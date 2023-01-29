@@ -132,28 +132,47 @@ namespace polyfem::mesh
 
 		// --------------------------------------------------------------------
 
-		if (!j_mesh["point_selection"].is_null())
-			log_and_throw_error("Geometry point seleections are not implemented nor used!");
+		const std::vector<std::shared_ptr<Selection>> node_selections =
+			is_param_valid(j_mesh, "point_selection") ? Selection::build_selections(j_mesh["point_selection"], bbox, root_path) : std::vector<std::shared_ptr<Selection>>();
+
+		if (!node_selections.empty())
+		{
+			mesh->compute_node_ids([&](const size_t n_id, const RowVectorNd &p, bool is_boundary) {
+				if (!is_boundary)
+					return -1;
+
+				const std::vector<int> tmp = {int(n_id)};
+				for (const auto &selection : node_selections)
+				{
+					if (selection->inside(n_id, tmp, p))
+						return selection->id(n_id, tmp, p);
+				}
+				return std::numeric_limits<int>::max(); // default for no selected boundary
+			});
+		}
 
 		if (!j_mesh["curve_selection"].is_null())
-			log_and_throw_error("Geometry point seleections are not implemented nor used!");
+			log_and_throw_error("Geometry point selections are not implemented nor used!");
 
 		// --------------------------------------------------------------------
 
 		std::vector<std::shared_ptr<Selection>> surface_selections =
-			Selection::build_selections(j_mesh["surface_selection"], bbox, root_path);
+			is_param_valid(j_mesh, "surface_selection") ? Selection::build_selections(j_mesh["surface_selection"], bbox, root_path) : std::vector<std::shared_ptr<Selection>>();
 
-		mesh->compute_boundary_ids([&](const size_t p_id, const std::vector<int> &vs, const RowVectorNd &p, bool is_boundary) {
-			if (!is_boundary)
-				return -1;
+		if (!surface_selections.empty())
+		{
+			mesh->compute_boundary_ids([&](const size_t p_id, const std::vector<int> &vs, const RowVectorNd &p, bool is_boundary) {
+				if (!is_boundary)
+					return -1;
 
-			for (const auto &selection : surface_selections)
-			{
-				if (selection->inside(p_id, vs, p))
-					return selection->id(p_id, vs, p);
-			}
-			return std::numeric_limits<int>::max(); // default for no selected boundary
-		});
+				for (const auto &selection : surface_selections)
+				{
+					if (selection->inside(p_id, vs, p))
+						return selection->id(p_id, vs, p);
+				}
+				return std::numeric_limits<int>::max(); // default for no selected boundary
+			});
+		}
 
 		// --------------------------------------------------------------------
 
@@ -361,6 +380,7 @@ namespace polyfem::mesh
 	Obstacle read_obstacle_geometry(
 		const json &geometry,
 		const std::vector<json> &displacements,
+		const std::vector<json> &dirichlets,
 		const std::string &root_path,
 		const int dim,
 		const std::vector<std::string> &_names,
@@ -432,6 +452,16 @@ namespace polyfem::mesh
 						log_and_throw_error("Invalid surface_selection for obstacle, needs to be an integer!");
 
 					const int id = geometry["surface_selection"];
+					for (const json &disp : dirichlets)
+					{
+						// TODO: Add support for array of ints
+						if ((disp["id"].is_string() && disp["id"].get<std::string>() == "all")
+							|| (disp["id"].is_number_integer() && disp["id"].get<int>() == id))
+						{
+							displacement = disp;
+							break;
+						}
+					}
 					for (const json &disp : displacements)
 					{
 						// TODO: Add support for array of ints

@@ -34,19 +34,9 @@ endif()
 # cmake_policy(SET CMP0135 NEW) # https://cmake.org/cmake/help/latest/policy/CMP0135.html
 
 # ###############################################################################
-project(PolyFEM DESCRIPTION "A polyvalent C++ FEM library")
+project(PolyFEM DESCRIPTION "A polyvalent C++ FEM library" LANGUAGES C CXX)
 
 # ###############################################################################
-if(INPUT_POLYFEM_DATA_ROOT)
-    set(POLYFEM_DATA_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/${INPUT_POLYFEM_DATA_ROOT}/")
-else()
-    set(POLYFEM_DATA_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/data/")
-endif()
-
-if(NOT EXISTS ${POLYFEM_DATA_ROOT})
-    file(MAKE_DIRECTORY ${POLYFEM_DATA_ROOT})
-endif()
-
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/recipes/")
 
@@ -88,40 +78,7 @@ option(POLYFEM_REGENERATE_AUTOGEN "Generate the python autogen files" OFF)
 set(POLYFEM_THREADING "TBB" CACHE STRING "Multithreading library to use (options: CPP, TBB, NONE)")
 set_property(CACHE POLYFEM_THREADING PROPERTY STRINGS "CPP" "TBB" "NONE")
 
-option(POLYFEM_WITH_REMESHING "Uses VMTK for remeshing" OFF)
-option(POLYFEM_WITH_TESTS "Build tests" ON)
-option(POLYFEM_WITH_CLIPPER "Use clipper, necessary for polygonal bases" ON)
-
-# Solver
-option(POLYSOLVE_WITH_CHOLMOD "Enable Cholmod library" ON)
-option(POLYSOLVE_WITH_UMFPACK "Enable UmfPack library" ON)
-option(POLYSOLVE_WITH_SUPERLU "Enable SuperLU library" ON)
-option(POLYSOLVE_WITH_MKL "Enable MKL library" ON)
-option(POLYSOLVE_WITH_PARDISO "Enable Pardiso library" ON)
-option(POLYSOLVE_WITH_HYPRE "Enable hypre" OFF)
-option(POLYSOLVE_WITH_AMGCL "Use AMGCL" ON)
-option(POLYSOLVE_WITH_SPECTRA "Enable computing spectrum" OFF)
-option(POLYSOLVE_LARGE_INDEX "Build for large indices" OFF)
-
-if(CMAKE_OSX_ARCHITECTURES STREQUAL arm64)
-    set(POLYSOLVE_WITH_CHOLMOD OFF CACHE BOOL "Enable Cholmod library" FORCE)
-    set(POLYSOLVE_WITH_UMFPACK OFF CACHE BOOL "Enable UmfPack library" FORCE)
-    set(POLYSOLVE_WITH_SUPERLU OFF CACHE BOOL "Enable SuperLU library" FORCE)
-    set(POLYSOLVE_WITH_MKL OFF CACHE BOOL "Enable MKL library" FORCE)
-endif()
-
-# Options for libigl modules
-option(LIBIGL_USE_STATIC_LIBRARY "Use libigl as static library" OFF)
-option(LIBIGL_WITH_ANTTWEAKBAR "Use AntTweakBar" OFF)
-option(LIBIGL_WITH_CGAL "Use CGAL" OFF)
-option(LIBIGL_WITH_COMISO "Use CoMiso" OFF)
-option(LIBIGL_WITH_CORK "Use Cork" OFF)
-option(LIBIGL_WITH_EMBREE "Use Embree" OFF)
-option(LIBIGL_WITH_LIM "Use LIM" OFF)
-option(LIBIGL_WITH_MATLAB "Use Matlab" OFF)
-option(LIBIGL_WITH_MOSEK "Use MOSEK" OFF)
 option(LIBIGL_WITH_OPENGL "Use OpenGL" OFF)
-option(LIBIGL_WITH_OPENGL_GLFW "Use GLFW" OFF)
 option(LIBIGL_WITH_OPENGL_GLFW_IMGUI "Use ImGui" OFF)
 option(LIBIGL_WITH_PNG "Use PNG" OFF)
 option(LIBIGL_WITH_PYTHON "Use Python" OFF)
@@ -165,6 +122,41 @@ include(sanitizers)
 # add_library() can only be called without any source since CMake 3.11 ...
 add_library(polyfem)
 add_library(polyfem::polyfem ALIAS polyfem)
+
+# ###############################################################################
+# CUDA
+# ###############################################################################
+if(IPC_TOOLKIT_WITH_CUDA OR POLYSOLVE_WITH_CUSOLVER OR WITH_GPU)
+    include(CheckLanguage)
+    check_language(CUDA)
+
+    if(CMAKE_CUDA_COMPILER)
+        enable_language(CUDA)
+    else()
+        message(FATAL_ERROR "No CUDA support found!")
+    endif()
+
+    set_target_properties(polyfem PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
+
+    # Nvidia RTX8000 -> compute_75
+    # Nvidia V100 -> compute_70
+    # Nvidia 1080/1080Ti -> compute_61
+    # Nvidia 3080Ti -> compute_86
+    if(NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
+        set(CMAKE_CUDA_ARCHITECTURES 70 75 86)
+    endif()
+
+    set_target_properties(polyfem PROPERTIES CUDA_ARCHITECTURES "70;75;86")
+    target_link_libraries(${PROJECT_NAME}_bin
+        PUBLIC
+        -lcublas
+        -lcurand
+        ${CUDA_cusparse_LIBRARY}
+    )
+    target_link_libraries(polyfem PUBLIC ${CUDA_cusparse_LIBRARY})
+
+    # set_target_properties(PolyFEM_bin PROPERTIES CUDA_ARCHITECTURES "70;75;86")
+endif()
 
 # Must be call in the same "CMakeLists.txt" where add_library(polyfem ...) is called
 polyfem_autogen(polyfem eigs.py auto_eigs)
@@ -225,6 +217,11 @@ endif()
 # libigl
 include(libigl)
 target_link_libraries(polyfem PUBLIC igl::core)
+
+if(LIBIGL_WITH_TRIANGLE)
+    target_link_libraries(polyfem PUBLIC igl::triangle)
+    target_compile_definitions(polyfem PUBLIC -DPOLYFEM_WITH_TRIANGLE)
+endif()
 
 # BVH
 include(BVH)
@@ -383,55 +380,4 @@ if(POLYFEM_TOPLEVEL_PROJECT)
         enable_testing()
         add_subdirectory(tests)
     endif()
-endif()
-
-# ###############################################################################
-# CUDA
-# ###############################################################################
-
-# if(WITH_GPU)
-# Thrust library
-
-# target_include_directories(polyfem PUBLIC ${Thrust_INCLUDE_DIRS})
-# target_link_libraries(polyfem PUBLIC Thrust)
-
-# USING AS SHARED LIBRARY
-
-# set(CUDA_USE_STATIC_CUDA_RUNTIME OFF CACHE INTERNAL "")
-if(WITH_GPU)
-    include(CheckLanguage)
-    check_language(CUDA)
-
-    if(CMAKE_CUDA_COMPILER)
-        enable_language(CUDA)
-    else()
-        message(FATAL_ERROR "No CUDA support found!")
-    endif()
-
-    set_target_properties(polyfem PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
-
-    # SETTING OPT 0 compiler flag for DEBUG mode
-    # string(REGEX REPLACE "(\-O[011123456789])" "" CMAKE_CUDA_FLAGS_DEBUG "${CMAKE_CUDA_FLAGS_DEBUG}")
-    # set(CMAKE_CUDA_FLAGS_DEBUG "${CMAKE_CUDA_FLAGS_DEBUG} -O0 -G")
-
-    # foreach(flag IN LISTS ${CXX17_FEATURES})
-    # add_compile_options("$<$<COMPILE_LANGUAGE:CUDA>:--compiler-options=${flag}>")
-    # endforeach()
-    # Nvidia RTX8000 -> compute_75
-    # Nvidia V100 -> compute_70
-    # Nvidia 1080/1080Ti -> compute_61
-    # Nvidia 3080Ti -> compute_86
-    if(NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
-        set(CMAKE_CUDA_ARCHITECTURES 60 70 75 86)
-    endif()
-
-    set_target_properties(polyfem PROPERTIES CUDA_ARCHITECTURES "60;70;75;86")
-    set_target_properties(PolyFEM_bin PROPERTIES CUDA_ARCHITECTURES "60;70;75;86")
-    target_link_libraries(${PROJECT_NAME}_bin
-        PUBLIC
-        -lcublas
-        -lcurand
-        ${CUDA_cusparse_LIBRARY}
-    )
-    target_link_libraries(polyfem PUBLIC ${CUDA_cusparse_LIBRARY})
 endif()

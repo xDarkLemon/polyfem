@@ -19,17 +19,24 @@ set(SOURCES
 	Laplacian.hpp
 	LinearElasticity.cpp
 	LinearElasticity.hpp
+	GenericElastic.cpp
+	GenericElastic.hpp
 	Mass.cpp
 	Mass.hpp
+	MatParams.cpp
+	MatParams.hpp
+	MooneyRivlinElasticity.cpp
+	MooneyRivlinElasticity.hpp
 	MultiModel.cpp
 	MultiModel.hpp
 	NeoHookeanElasticity_GPU.cu
 	NeoHookeanElasticity.cpp
 	NeoHookeanElasticity.hpp
-
-	# OgdenElasticity.cpp
-	# OgdenElasticity.hpp
 	RhsAssembler.cu
+	NeoHookeanElasticityAutodiff.cpp
+	NeoHookeanElasticityAutodiff.hpp
+	OgdenElasticity.cpp
+	OgdenElasticity.hpp
 	RhsAssembler.cpp
 	RhsAssembler.hpp
 	SaintVenantElasticity.cpp

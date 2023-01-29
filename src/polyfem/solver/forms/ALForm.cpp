@@ -59,7 +59,7 @@ namespace polyfem::solver
 		// ∑ -⎷ mₖ λₖᵀ (xₖ - x̂ₖ) = -λᵀ M (x - x̂)
 		// ᵏ
 
-		logger().trace("AL_penalty={}", sqrt(AL_penalty));
+		// logger().trace("AL_penalty={}", sqrt(AL_penalty));
 
 		return AL_penalty;
 	}
@@ -69,7 +69,7 @@ namespace polyfem::solver
 		gradv = masked_lumped_mass_ * (x - target_x_);
 	}
 
-	void ALForm::second_derivative_unweighted(const Eigen::VectorXd &x, StiffnessMatrix &hessian)
+	void ALForm::second_derivative_unweighted(const Eigen::VectorXd &x, StiffnessMatrix &hessian) const
 	{
 		hessian = masked_lumped_mass_;
 	}

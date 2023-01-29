@@ -44,6 +44,7 @@ namespace polyfem::io
 			bool volume;
 			bool surface;
 			bool wire;
+			bool points;
 			bool contact_forces;
 			bool friction_forces;
 
@@ -79,6 +80,7 @@ namespace polyfem::io
 		/// @param[out] boundary_nodes_pos nodes positions
 		/// @param[out] boundary_edges edges
 		/// @param[out] boundary_triangles triangles
+		/// @param[out] displacement_map map of collision mesh vertices to nodes, empty if identity
 		static void extract_boundary_mesh(
 			const mesh::Mesh &mesh,
 			const int n_bases,
@@ -86,7 +88,8 @@ namespace polyfem::io
 			const std::vector<mesh::LocalBoundary> &total_local_boundary,
 			Eigen::MatrixXd &boundary_nodes_pos,
 			Eigen::MatrixXi &boundary_edges,
-			Eigen::MatrixXi &boundary_triangles);
+			Eigen::MatrixXi &boundary_triangles,
+			std::vector<Eigen::Triplet<double>> &displacement_map_entries);
 
 		/// @brief unitalize the ref element sampler
 		/// @param[in] mesh mesh
@@ -100,6 +103,8 @@ namespace polyfem::io
 
 		/// @brief exports everytihng, txt, vtu, etc
 		/// @param[in] state state to get the data
+		/// @param[in] sol solution
+		/// @param[in] pressure pressure
 		/// @param[in] is_time_dependent if the sim is time dependent
 		/// @param[in] tend_in end time
 		/// @param[in] dt delta t
@@ -113,6 +118,8 @@ namespace polyfem::io
 		/// @param[out] solution_frames saves the output here instead of vtu
 		void export_data(
 			const State &state,
+			const Eigen::MatrixXd &sol,
+			const Eigen::MatrixXd &pressure,
 			const bool is_time_dependent,
 			const double tend_in,
 			const double dt,
@@ -128,6 +135,8 @@ namespace polyfem::io
 		/// saves the vtu file for time t
 		/// @param[in] path filename
 		/// @param[in] state state to get the data
+		/// @param[in] sol solution
+		/// @param[in] pressure pressure
 		/// @param[in] t time
 		/// @param[in] dt delta t
 		/// @param[in] opts export options
@@ -135,6 +144,8 @@ namespace polyfem::io
 		/// @param[out] solution_frames saves the output here instead of vtu
 		void save_vtu(const std::string &path,
 					  const State &state,
+					  const Eigen::MatrixXd &sol,
+					  const Eigen::MatrixXd &pressure,
 					  const double t,
 					  const double dt,
 					  const ExportOptions &opts,
@@ -144,11 +155,15 @@ namespace polyfem::io
 		/// saves the volume vtu file
 		/// @param[in] path filename
 		/// @param[in] state state to get the data
+		/// @param[in] sol solution
+		/// @param[in] pressure pressure
 		/// @param[in] t time
 		/// @param[in] opts export options
 		/// @param[out] solution_frames saves the output here instead of vtu
 		void save_volume(const std::string &path,
 						 const State &state,
+						 const Eigen::MatrixXd &sol,
+						 const Eigen::MatrixXd &pressure,
 						 const double t,
 						 const ExportOptions &opts,
 						 std::vector<SolutionFrame> &solution_frames) const;
@@ -156,12 +171,18 @@ namespace polyfem::io
 		/// saves the surface vtu file for for surface quantites, eg traction forces
 		/// @param[in] export_surface filename
 		/// @param[in] state state to get the data
+		/// @param[in] sol solution
+		/// @param[in] pressure pressure
+		/// @param[in] t time
 		/// @param[in] dt_in delta_t
 		/// @param[in] opts export options
 		/// @param[in] is_contact_enabled if contact is enabled
 		/// @param[out] solution_frames saves the output here instead of vtu
 		void save_surface(const std::string &export_surface,
 						  const State &state,
+						  const Eigen::MatrixXd &sol,
+						  const Eigen::MatrixXd &pressure,
+						  const double t,
 						  const double dt_in,
 						  const ExportOptions &opts,
 						  const bool is_contact_enabled,
@@ -170,14 +191,29 @@ namespace polyfem::io
 		/// saves the wireframe
 		/// @param[in] name filename
 		/// @param[in] state state to get the data
+		/// @param[in] sol solution
 		/// @param[in] t time
 		/// @param[in] opts export options
 		/// @param[out] solution_frames saves the output here instead of vtu
 		void save_wire(const std::string &name,
 					   const State &state,
+					   const Eigen::MatrixXd &sol,
 					   const double t,
 					   const ExportOptions &opts,
 					   std::vector<SolutionFrame> &solution_frames) const;
+
+		/// saves the nodal values
+		/// @param[in] path filename
+		/// @param[in] state state to get the data
+		/// @param[in] sol solution
+		/// @param[in] opts export options
+		/// @param[out] solution_frames saves the output here instead of vtu
+		void save_points(
+			const std::string &path,
+			const State &state,
+			const Eigen::MatrixXd &sol,
+			const ExportOptions &opts,
+			std::vector<SolutionFrame> &solution_frames) const;
 
 		/// save a PVD of a time dependent simulation
 		/// @param[in] name filename

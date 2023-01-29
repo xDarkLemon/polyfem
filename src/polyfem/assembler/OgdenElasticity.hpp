@@ -3,9 +3,9 @@
 #include <polyfem/Common.hpp>
 #include <polyfem/utils/ElasticityUtils.hpp>
 
-#include <polyfem/assembler/ElementAssemblyValues.hpp>
-#include <polyfem/basis/ElementBases.hpp>
+#include <polyfem/autogen/auto_eigs.hpp>
 #include <polyfem/utils/AutodiffTypes.hpp>
+#include <polyfem/utils/MatrixUtils.hpp>
 #include <polyfem/utils/Types.hpp>
 
 #include <Eigen/Dense>
@@ -19,34 +19,68 @@ namespace polyfem::assembler
 	public:
 		OgdenElasticity();
 
-		Eigen::MatrixXd assemble_hessian(const NonLinearAssemblerData &data) const;
-		Eigen::VectorXd assemble_grad(const NonLinearAssemblerData &data) const;
-		double compute_energy(const NonLinearAssemblerData &data) const;
+		// sets material params
+		void add_multimaterial(const int index, const json &params, const int size);
 
-		Eigen::Matrix<double, Eigen::Dynamic, 1, 0, 3, 1>
-		compute_rhs(const AutodiffHessianPt &pt) const;
+		// http://abaqus.software.polimi.it/v6.14/books/stm/default.htm?startat=ch04s06ath123.html Ogden form
+		template <typename T>
+		T elastic_energy(const int size,
+						 const RowVectorNd &p,
+						 const int el_id,
+						 const Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic, 0, 3, 3> &disp_grad) const
+		{
+			// Id + grad d
+			auto def_grad = disp_grad;
+			for (int d = 0; d < size; ++d)
+				def_grad(d, d) += T(1);
 
-		inline int size() const { return size_; }
-		void set_size(const int size);
+			Eigen::Matrix<T, Eigen::Dynamic, 1, 0, 3, 1> eigs;
 
-		void set_stiffness_tensor(int i, int j, const double val);
-		double stifness_tensor(int i, int j) const;
+			if (size == 2)
+				autogen::eigs_2d<T>(def_grad, eigs);
+			else if (size == 3)
+				autogen::eigs_3d<T>(def_grad, eigs);
+			else
+				assert(false);
 
-		void compute_von_mises_stresses(const int el_id, const basis::ElementBases &bs, const basis::ElementBases &gbs, const Eigen::MatrixXd &local_pts, const Eigen::MatrixXd &displacement, Eigen::MatrixXd &stresses) const;
-		void compute_stress_tensor(const int el_id, const basis::ElementBases &bs, const basis::ElementBases &gbs, const Eigen::MatrixXd &local_pts, const Eigen::MatrixXd &displacement, Eigen::MatrixXd &tensor) const;
+			const T J = utils::determinant(def_grad);
+			const T Jdenom = pow(J, -1. / size);
 
-		void add_multimaterial(const int index, const json &params);
+			for (long i = 0; i < eigs.size(); ++i)
+				eigs(i) = eigs(i) * Jdenom;
+
+			auto val = T(0);
+			for (long N = 0; N < alphas_.size(); ++N)
+			{
+				auto tmp = T(-size);
+				const double alpha = alphas_(N);
+				const double mu = mus_(N);
+
+				for (long i = 0; i < eigs.size(); ++i)
+					tmp += pow(eigs(i), alpha);
+
+				val += 2 * mu / (alpha * alpha) * tmp;
+			}
+
+			// std::cout<<val<<std::endl;
+
+			for (long N = 0; N < Ds_.size(); ++N)
+			{
+				const double D = Ds_(N);
+
+				val += 1. / D * pow(J - T(1), 2 * (N + 1));
+			}
+
+			return val;
+		}
+
+		const Eigen::VectorXd &alphas() const { return alphas_; }
+		const Eigen::VectorXd &mus() const { return mus_; }
+		const Eigen::VectorXd &Ds() const { return Ds_; }
 
 	private:
-		int size_ = 2;
-
 		Eigen::VectorXd alphas_;
 		Eigen::VectorXd mus_;
 		Eigen::VectorXd Ds_;
-
-		template <typename T>
-		T compute_energy_aux(const NonLinearAssemblerData &data) const;
-
-		void assign_stress_tensor(const int el_id, const basis::ElementBases &bs, const basis::ElementBases &gbs, const Eigen::MatrixXd &local_pts, const Eigen::MatrixXd &displacement, const int all_size, Eigen::MatrixXd &all, const std::function<Eigen::MatrixXd(const Eigen::MatrixXd &)> &fun) const;
 	};
 } // namespace polyfem::assembler

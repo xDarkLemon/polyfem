@@ -28,7 +28,7 @@ namespace polyfem::solver
 				 const int n_boundary_samples,
 				 const Eigen::MatrixXd &rhs,
 				 const assembler::RhsAssembler &rhs_assembler,
-				 const Density &density,
+				 const assembler::Density &density,
 				 const bool apply_DBC,
 				 const bool is_formulation_mixed,
 				 const bool is_time_dependent,
@@ -63,7 +63,7 @@ namespace polyfem::solver
 		/// @brief Compute the second derivative of the value wrt x
 		/// @param[in] x Current solution
 		/// @param[out] hessian Output Hessian of the value wrt x
-		void second_derivative_unweighted(const Eigen::VectorXd &x, StiffnessMatrix &hessian) override { hessian.resize(x.size(), x.size()); }
+		void second_derivative_unweighted(const Eigen::VectorXd &x, StiffnessMatrix &hessian) const override { hessian.resize(x.size(), x.size()); }
 
 	public:
 		/// @brief Update time dependent quantities
@@ -88,7 +88,7 @@ namespace polyfem::solver
 		const int n_boundary_samples_;
 
 		const assembler::RhsAssembler &rhs_assembler_; ///< Reference to the RHS assembler
-		const Density &density_;
+		const assembler::Density &density_;
 		bool is_formulation_mixed_; ///< True if the formulation is mixed
 
 		double t_;       ///< Current time

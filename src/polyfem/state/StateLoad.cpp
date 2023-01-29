@@ -31,8 +31,6 @@ namespace polyfem
 
 		stiffness.resize(0, 0);
 		rhs.resize(0, 0);
-		sol.resize(0, 0);
-		pressure.resize(0, 0);
 
 		n_bases = 0;
 		n_pressure_bases = 0;
@@ -86,7 +84,8 @@ namespace polyfem
 		timer.start();
 		logger().info("Loading obstacles...");
 		obstacle = mesh::read_obstacle_geometry(
-			args["geometry"], args["boundary_conditions"]["obstacle_displacements"],
+			args["geometry"],
+			args["boundary_conditions"]["obstacle_displacements"], args["boundary_conditions"]["dirichlet_boundary"],
 			args["root_path"], mesh->dimension());
 		timer.stop();
 		logger().info(" took {}s", timer.getElapsedTime());
@@ -126,7 +125,7 @@ namespace polyfem
 		// {
 		// 	mesh->compute_elements_tag();
 		// 	for(auto el_id : flipped_elements)
-		// 		mesh->set_tag(el_id, ElementType::InteriorPolytope);
+		// 		mesh->set_tag(el_id, ElementType::INTERIOR_POLYTOPE);
 		// }
 
 		RowVectorNd min, max;
@@ -145,7 +144,8 @@ namespace polyfem
 		timer.start();
 		logger().info("Loading obstacles...");
 		obstacle = mesh::read_obstacle_geometry(
-			args["geometry"], args["boundary_conditions"]["obstacle_displacements"],
+			args["geometry"],
+			args["boundary_conditions"]["obstacle_displacements"], args["boundary_conditions"]["dirichlet_boundary"],
 			args["root_path"], mesh->dimension(), names, vertices, cells);
 		timer.stop();
 		logger().info(" took {}s", timer.getElapsedTime());

@@ -72,17 +72,24 @@ namespace polyfem::io
 		const std::vector<mesh::LocalBoundary> &total_local_boundary,
 		Eigen::MatrixXd &boundary_nodes_pos,
 		Eigen::MatrixXi &boundary_edges,
-		Eigen::MatrixXi &boundary_triangles)
+		Eigen::MatrixXi &boundary_triangles,
+		std::vector<Eigen::Triplet<double>> &displacement_map_entries)
 	{
 		using namespace polyfem::mesh;
 
+		displacement_map_entries.clear();
+
 		if (mesh.is_volume())
 		{
-			boundary_nodes_pos.resize(n_bases, 3);
+			const bool is_simplicial = mesh.is_simplicial();
+
+			boundary_nodes_pos.resize(n_bases + (is_simplicial ? 0 : mesh.n_faces()), 3);
 			boundary_nodes_pos.setZero();
 			const Mesh3D &mesh3d = dynamic_cast<const Mesh3D &>(mesh);
 
 			std::vector<std::tuple<int, int, int>> tris;
+
+			std::vector<bool> visited_node(n_bases, false);
 
 			std::stringstream print_warning;
 
@@ -96,11 +103,60 @@ namespace polyfem::io
 					const int lid = lb[j];
 					const auto nodes = b.local_nodes_for_primitive(eid, mesh3d);
 
-					if (!mesh.is_simplex(lb.element_id()))
+					if (mesh.is_cube(lb.element_id()))
 					{
-						logger().trace("skipping element {} since it is not a simplex", eid);
+						assert(!is_simplicial);
+						assert(!mesh.has_poly());
+						std::vector<int> loc_nodes;
+						RowVectorNd bary = RowVectorNd::Zero(3);
+
+						for (long n = 0; n < nodes.size(); ++n)
+						{
+							auto &bs = b.bases[nodes(n)];
+							const auto &glob = bs.global();
+							if (glob.size() != 1)
+								continue;
+
+							int gindex = glob.front().index;
+							boundary_nodes_pos.row(gindex) = glob.front().node;
+							bary += glob.front().node;
+							loc_nodes.push_back(gindex);
+						}
+
+						if (loc_nodes.size() != 4)
+						{
+							logger().trace("skipping element {} since it is not Q1", eid);
+							continue;
+						}
+
+						bary /= 4;
+
+						const int new_node = n_bases + eid;
+						boundary_nodes_pos.row(new_node) = bary;
+						tris.emplace_back(loc_nodes[1], loc_nodes[0], new_node);
+						tris.emplace_back(loc_nodes[2], loc_nodes[1], new_node);
+						tris.emplace_back(loc_nodes[3], loc_nodes[2], new_node);
+						tris.emplace_back(loc_nodes[0], loc_nodes[3], new_node);
+
+						for (int q = 0; q < 4; ++q)
+						{
+							if (!visited_node[loc_nodes[q]])
+								displacement_map_entries.emplace_back(loc_nodes[q], loc_nodes[q], 1);
+
+							visited_node[loc_nodes[q]] = true;
+							displacement_map_entries.emplace_back(new_node, loc_nodes[q], 0.25);
+						}
+
 						continue;
 					}
+
+					if (!mesh.is_simplex(lb.element_id()))
+					{
+						logger().trace("skipping element {} since it is not a simplex or hex", eid);
+						continue;
+					}
+
+					assert(is_simplicial);
 
 					std::vector<int> loc_nodes;
 
@@ -281,30 +337,30 @@ namespace polyfem::io
 			{
 				switch (lb.type())
 				{
-				case BoundaryType::TriLine:
+				case BoundaryType::TRI_LINE:
 					utils::BoundarySampler::normal_for_tri_edge(lb[k], tmp_n);
 					utils::BoundarySampler::sample_parametric_tri_edge(lb[k], n_samples, uv, local_pts);
 					break;
-				case BoundaryType::QuadLine:
+				case BoundaryType::QUAD_LINE:
 					utils::BoundarySampler::normal_for_quad_edge(lb[k], tmp_n);
 					utils::BoundarySampler::sample_parametric_quad_edge(lb[k], n_samples, uv, local_pts);
 					break;
-				case BoundaryType::Quad:
+				case BoundaryType::QUAD:
 					utils::BoundarySampler::normal_for_quad_face(lb[k], tmp_n);
 					utils::BoundarySampler::sample_parametric_quad_face(lb[k], n_samples, uv, local_pts);
 					break;
-				case BoundaryType::Tri:
+				case BoundaryType::TRI:
 					utils::BoundarySampler::normal_for_tri_face(lb[k], tmp_n);
 					utils::BoundarySampler::sample_parametric_tri_face(lb[k], n_samples, uv, local_pts);
 					break;
-				case BoundaryType::Polygon:
-					utils::BoundarySampler::normal_for_polygon_edge(lb[k], lb.global_primitive_id(k), mesh, tmp_n);
+				case BoundaryType::POLYGON:
+					utils::BoundarySampler::normal_for_polygon_edge(lb.element_id(), lb.global_primitive_id(k), mesh, tmp_n);
 					utils::BoundarySampler::sample_polygon_edge(lb.element_id(), lb.global_primitive_id(k), n_samples, mesh, uv, local_pts);
 					break;
-				case BoundaryType::Polyhedron:
+				case BoundaryType::POLYHEDRON:
 					assert(false);
 					break;
-				case BoundaryType::Invalid:
+				case BoundaryType::INVALID:
 					assert(false);
 					break;
 				default:
@@ -321,7 +377,7 @@ namespace polyfem::io
 
 				if (mesh.is_volume())
 				{
-					if (lb.type() == BoundaryType::Quad)
+					if (lb.type() == BoundaryType::QUAD)
 					{
 						const auto map = [n_samples, size](int i, int j) { return j * n_samples + i + size; };
 
@@ -334,7 +390,7 @@ namespace polyfem::io
 							}
 						}
 					}
-					else if (lb.type() == BoundaryType::Tri)
+					else if (lb.type() == BoundaryType::TRI)
 					{
 						int index = 0;
 						std::vector<int> mapp(n_samples * n_samples, -1);
@@ -490,7 +546,7 @@ namespace polyfem::io
 		int pts_total_size = 0;
 
 		Eigen::MatrixXd vis_pts_poly;
-		Eigen::MatrixXi vis_faces_poly;
+		Eigen::MatrixXi vis_faces_poly, vis_edges_poly;
 
 		for (size_t i = 0; i < current_bases.size(); ++i)
 		{
@@ -513,14 +569,14 @@ namespace polyfem::io
 			{
 				if (mesh.is_volume())
 				{
-					sampler.sample_polyhedron(polys_3d.at(i).first, polys_3d.at(i).second, vis_pts_poly, vis_faces_poly);
+					sampler.sample_polyhedron(polys_3d.at(i).first, polys_3d.at(i).second, vis_pts_poly, vis_faces_poly, vis_edges_poly);
 
 					tet_total_size += vis_faces_poly.rows();
 					pts_total_size += vis_pts_poly.rows();
 				}
 				else
 				{
-					sampler.sample_polygon(polys.at(i), vis_pts_poly, vis_faces_poly);
+					sampler.sample_polygon(polys.at(i), vis_pts_poly, vis_faces_poly, vis_edges_poly);
 
 					tet_total_size += vis_faces_poly.rows();
 					pts_total_size += vis_pts_poly.rows();
@@ -572,7 +628,7 @@ namespace polyfem::io
 			{
 				if (mesh.is_volume())
 				{
-					sampler.sample_polyhedron(polys_3d.at(i).first, polys_3d.at(i).second, vis_pts_poly, vis_faces_poly);
+					sampler.sample_polyhedron(polys_3d.at(i).first, polys_3d.at(i).second, vis_pts_poly, vis_faces_poly, vis_edges_poly);
 					bs.eval_geom_mapping(vis_pts_poly, mapped);
 
 					tets.block(tet_index, 0, vis_faces_poly.rows(), tets.cols()) = vis_faces_poly.array() + pts_index;
@@ -585,7 +641,7 @@ namespace polyfem::io
 				}
 				else
 				{
-					sampler.sample_polygon(polys.at(i), vis_pts_poly, vis_faces_poly);
+					sampler.sample_polygon(polys.at(i), vis_pts_poly, vis_faces_poly, vis_edges_poly);
 					bs.eval_geom_mapping(vis_pts_poly, mapped);
 
 					tets.block(tet_index, 0, vis_faces_poly.rows(), tets.cols()) = vis_faces_poly.array() + pts_index;
@@ -648,7 +704,10 @@ namespace polyfem::io
 				else if (mesh.is_cube(i))
 					autogen::q_nodes_2d(disc_orders(i), ref_pts);
 				else
-					continue;
+				{
+					const int n_v = static_cast<const mesh::Mesh2D &>(mesh).n_face_vertices(i);
+					ref_pts.resize(n_v, 2);
+				}
 			}
 
 			pts_total_size += ref_pts.rows();
@@ -711,7 +770,7 @@ namespace polyfem::io
 						std::swap(elements[i][18], elements[i][19]);
 					}
 					if (disc_orders(i) > 4)
-						error_msg = "not implementd!!!"; // TODO: higher than 3
+						error_msg = ">P4 implementd!!!"; // TODO: higher than 3
 				}
 				else
 				{
@@ -721,21 +780,42 @@ namespace polyfem::io
 						std::swap(elements[i][n_nodes - 1], elements[i][n_nodes - 2]);
 					}
 					if (disc_orders(i) > 4)
-						error_msg = "not implementd!!!"; // TODO: higher than 3
+						error_msg = ">P4 implementd!!!"; // TODO: higher than 3
 				}
 			}
-			else
-				error_msg = "not implementd!!!"; // TODO: hexes
+			else if (disc_orders(i) > 1)
+				error_msg = ">Q1 not implementd!!!";
 		}
 
 		if (!error_msg.empty())
 			logger().warn(error_msg);
+
+		for (size_t i = 0; i < bases.size(); ++i)
+		{
+			if (!mesh.is_volume() && !mesh.is_polytope(i))
+				continue;
+
+			const auto &mesh2d = static_cast<const mesh::Mesh2D &>(mesh);
+			const int n_v = mesh2d.n_face_vertices(i);
+
+			for (int j = 0; j < n_v; ++j)
+			{
+				points.row(pts_index) = mesh2d.point(mesh2d.face_vertex(i, j));
+				el_id(pts_index) = i;
+				discr(pts_index) = disc_orders(i);
+				elements[i].push_back(pts_index);
+
+				pts_index++;
+			}
+		}
 
 		assert(pts_index == points.rows());
 	}
 
 	void OutGeometryData::export_data(
 		const State &state,
+		const Eigen::MatrixXd &sol,
+		const Eigen::MatrixXd &pressure,
 		const bool is_time_dependent,
 		const double tend_in,
 		const double dt,
@@ -758,7 +838,6 @@ namespace polyfem::io
 		const std::vector<basis::ElementBases> &gbases = state.geom_bases();
 		const mesh::Mesh &mesh = *state.mesh;
 		const Eigen::VectorXi &in_node_to_node = state.in_node_to_node;
-		const Eigen::MatrixXd &sol = state.sol;
 		const Eigen::MatrixXd &rhs = state.rhs;
 		const assembler::Problem &problem = *state.problem;
 
@@ -825,7 +904,7 @@ namespace polyfem::io
 		if (!vis_mesh_path.empty() && !is_time_dependent)
 		{
 			save_vtu(
-				vis_mesh_path, state,
+				vis_mesh_path, state, sol, pressure,
 				tend, dt, opts,
 				is_contact_enabled, solution_frames);
 		}
@@ -880,6 +959,7 @@ namespace polyfem::io
 		volume = args["output"]["paraview"]["volume"];
 		surface = args["output"]["paraview"]["surface"];
 		wire = args["output"]["paraview"]["wireframe"];
+		points = args["output"]["paraview"]["points"];
 		contact_forces = args["output"]["paraview"]["options"]["contact_forces"] && !is_problem_scalar;
 		friction_forces = args["output"]["paraview"]["options"]["friction_forces"] && !is_problem_scalar;
 
@@ -891,7 +971,7 @@ namespace polyfem::io
 		velocity = args["output"]["paraview"]["options"]["velocity"];
 		acceleration = args["output"]["paraview"]["options"]["acceleration"];
 
-		use_spline = args["space"]["advanced"]["use_spline"];
+		use_spline = args["space"]["basis_type"] == "Spline";
 
 		reorder_output = args["output"]["data"]["advanced"]["reorder_nodes"];
 
@@ -901,6 +981,8 @@ namespace polyfem::io
 	void OutGeometryData::save_vtu(
 		const std::string &path,
 		const State &state,
+		const Eigen::MatrixXd &sol,
+		const Eigen::MatrixXd &pressure,
 		const double t,
 		const double dt,
 		const ExportOptions &opts,
@@ -913,7 +995,6 @@ namespace polyfem::io
 			return;
 		}
 		const mesh::Mesh &mesh = *state.mesh;
-		const Eigen::MatrixXd &sol = state.sol;
 		const Eigen::MatrixXd &rhs = state.rhs;
 
 		if (state.n_bases <= 0)
@@ -939,18 +1020,23 @@ namespace polyfem::io
 
 		if (opts.volume)
 		{
-			save_volume(path, state, t, opts, solution_frames);
+			save_volume(path, state, sol, pressure, t, opts, solution_frames);
 		}
 
 		if (opts.surface)
 		{
-			save_surface(base_path + "_surf.vtu", state, dt, opts,
+			save_surface(base_path + "_surf.vtu", state, sol, pressure, t, dt, opts,
 						 is_contact_enabled, solution_frames);
 		}
 
 		if (opts.wire)
 		{
-			save_wire(base_path + "_wire.vtu", state, t, opts, solution_frames);
+			save_wire(base_path + "_wire.vtu", state, sol, t, opts, solution_frames);
+		}
+
+		if (opts.points)
+		{
+			save_points(base_path + "_points.vtu", state, sol, opts, solution_frames);
 		}
 
 		if (!opts.solve_export_to_file)
@@ -1003,6 +1089,16 @@ namespace polyfem::io
 			dataset->SetAttribute("file", (path_stem + "_wire.vtu").c_str());
 		}
 
+		if (opts.points)
+		{
+			tinyxml2::XMLElement *block = multiblock->InsertNewChildElement("Block");
+			block->SetAttribute("name", "Points");
+
+			tinyxml2::XMLElement *dataset = block->InsertNewChildElement("DataSet");
+			dataset->SetAttribute("name", "data");
+			dataset->SetAttribute("file", (path_stem + "_points.vtu").c_str());
+		}
+
 		tinyxml2::XMLElement *data_array = root->InsertNewChildElement("FieldData")->InsertNewChildElement("DataArray");
 		data_array->SetAttribute("type", "Float32");
 		data_array->SetAttribute("Name", "TimeValue");
@@ -1014,12 +1110,14 @@ namespace polyfem::io
 	void OutGeometryData::save_volume(
 		const std::string &path,
 		const State &state,
+		const Eigen::MatrixXd &sol,
+		const Eigen::MatrixXd &pressure,
 		const double t,
 		const ExportOptions &opts,
 		std::vector<SolutionFrame> &solution_frames) const
 	{
 		const Eigen::VectorXi &disc_orders = state.disc_orders;
-		const Density &density = state.assembler.density();
+		const auto &density = state.assembler.density();
 		const std::vector<basis::ElementBases> &bases = state.bases;
 		const std::vector<basis::ElementBases> &pressure_bases = state.pressure_bases;
 		const std::vector<basis::ElementBases> &gbases = state.geom_bases();
@@ -1030,8 +1128,6 @@ namespace polyfem::io
 		const std::string &formulation = state.formulation();
 		const mesh::Mesh &mesh = *state.mesh;
 		const mesh::Obstacle &obstacle = state.obstacle;
-		const Eigen::MatrixXd &sol = state.sol;
-		const Eigen::MatrixXd &pressure = state.pressure;
 		const assembler::Problem &problem = *state.problem;
 
 		Eigen::MatrixXd points;
@@ -1048,7 +1144,7 @@ namespace polyfem::io
 			build_high_oder_vis_mesh(mesh, disc_orders, bases,
 									 points, elements, el_id, discr);
 
-		Eigen::MatrixXd fun, exact_fun, err;
+		Eigen::MatrixXd fun, exact_fun, err, node_fun;
 
 		if (opts.sol_on_grid)
 		{
@@ -1116,9 +1212,19 @@ namespace polyfem::io
 			state.polys, state.polys_3d, ref_element_sampler,
 			points.rows(), sol, fun, opts.use_sampler, opts.boundary_only);
 
+		{
+			Eigen::MatrixXd tmp = Eigen::VectorXd::LinSpaced(sol.size(), 0, sol.size());
+
+			Evaluator::interpolate_function(
+				mesh, problem.is_scalar(), bases, state.disc_orders,
+				state.polys, state.polys_3d, ref_element_sampler,
+				points.rows(), tmp, node_fun, opts.use_sampler, opts.boundary_only);
+		}
+
 		if (obstacle.n_vertices() > 0)
 		{
 			fun.conservativeResize(fun.rows() + obstacle.n_vertices(), fun.cols());
+			node_fun.conservativeResize(node_fun.rows() + obstacle.n_vertices(), node_fun.cols());
 			obstacle.update_displacement(t, fun);
 		}
 
@@ -1140,7 +1246,10 @@ namespace polyfem::io
 		io::VTUWriter writer;
 
 		if (opts.solve_export_to_file)
+		{
 			writer.add_field("solution", fun);
+			writer.add_field("nodes", node_fun);
+		}
 		else
 			solution_frames.back().solution = fun;
 
@@ -1315,16 +1424,15 @@ namespace polyfem::io
 
 		if (opts.material_params)
 		{
-			const LameParameters &params = assembler.lame_params();
+			const auto &params = assembler.parameters(formulation);
 
-			Eigen::MatrixXd lambdas(points.rows(), 1);
-			Eigen::MatrixXd mus(points.rows(), 1);
-			Eigen::MatrixXd Es(points.rows(), 1);
-			Eigen::MatrixXd nus(points.rows(), 1);
+			std::map<std::string, Eigen::MatrixXd> param_val;
+			for (const auto &[p, _] : params)
+				param_val[p] = Eigen::MatrixXd(points.rows(), 1);
 			Eigen::MatrixXd rhos(points.rows(), 1);
 
 			Eigen::MatrixXd local_pts;
-			Eigen::MatrixXi vis_faces_poly;
+			Eigen::MatrixXi vis_faces_poly, vis_edges_poly;
 
 			int index = 0;
 			const auto &sampler = ref_element_sampler;
@@ -1342,9 +1450,9 @@ namespace polyfem::io
 					else
 					{
 						if (mesh.is_volume())
-							sampler.sample_polyhedron(polys_3d.at(e).first, polys_3d.at(e).second, local_pts, vis_faces_poly);
+							sampler.sample_polyhedron(polys_3d.at(e).first, polys_3d.at(e).second, local_pts, vis_faces_poly, vis_edges_poly);
 						else
-							sampler.sample_polygon(polys.at(e), local_pts, vis_faces_poly);
+							sampler.sample_polygon(polys.at(e), local_pts, vis_faces_poly, vis_edges_poly);
 					}
 				}
 				else
@@ -1365,7 +1473,16 @@ namespace polyfem::io
 						else if (mesh.is_cube(e))
 							autogen::q_nodes_2d(disc_orders(e), local_pts);
 						else
-							continue;
+						{
+							const auto &mesh2d = static_cast<const mesh::Mesh2D &>(mesh);
+							const int n_v = mesh2d.n_face_vertices(e);
+							local_pts.resize(n_v, 2);
+
+							for (int j = 0; j < n_v; ++j)
+							{
+								local_pts.row(j) = mesh2d.point(mesh2d.face_vertex(e, j));
+							}
+						}
 					}
 				}
 
@@ -1374,22 +1491,8 @@ namespace polyfem::io
 
 				for (int j = 0; j < vals.val.rows(); ++j)
 				{
-					double lambda, mu;
-
-					params.lambda_mu(local_pts.row(j), vals.val.row(j), e, lambda, mu);
-					lambdas(index) = lambda;
-					mus(index) = mu;
-
-					if (mesh.is_volume())
-					{
-						Es(index) = mu * (3.0 * lambda + 2.0 * mu) / (lambda + mu);
-						nus(index) = lambda / (2.0 * (lambda + mu));
-					}
-					else
-					{
-						Es(index) = 2 * mu * (2.0 * lambda + 2.0 * mu) / (lambda + 2.0 * mu);
-						nus(index) = lambda / (lambda + 2.0 * mu);
-					}
+					for (const auto &[p, func] : params)
+						param_val.at(p)(index) = func(local_pts.row(j), vals.val.row(j), t, e);
 
 					rhos(index) = density(local_pts.row(j), vals.val.row(j), e);
 
@@ -1401,26 +1504,17 @@ namespace polyfem::io
 
 			if (obstacle.n_vertices() > 0)
 			{
-				lambdas.conservativeResize(lambdas.size() + obstacle.n_vertices(), 1);
-				lambdas.bottomRows(obstacle.n_vertices()).setZero();
-
-				mus.conservativeResize(mus.size() + obstacle.n_vertices(), 1);
-				mus.bottomRows(obstacle.n_vertices()).setZero();
-
-				Es.conservativeResize(Es.size() + obstacle.n_vertices(), 1);
-				Es.bottomRows(obstacle.n_vertices()).setZero();
-
-				nus.conservativeResize(nus.size() + obstacle.n_vertices(), 1);
-				nus.bottomRows(obstacle.n_vertices()).setZero();
+				for (auto &[_, tmp] : param_val)
+				{
+					tmp.conservativeResize(tmp.size() + obstacle.n_vertices(), 1);
+					tmp.bottomRows(obstacle.n_vertices()).setZero();
+				}
 
 				rhos.conservativeResize(rhos.size() + obstacle.n_vertices(), 1);
 				rhos.bottomRows(obstacle.n_vertices()).setZero();
 			}
-
-			writer.add_field("lambda", lambdas);
-			writer.add_field("mu", mus);
-			writer.add_field("E", Es);
-			writer.add_field("nu", nus);
+			for (const auto &[p, tmp] : param_val)
+				writer.add_field(p, tmp);
 			writer.add_field("rho", rhos);
 		}
 
@@ -1487,7 +1581,7 @@ namespace polyfem::io
 			if (elements.empty())
 				writer.write_mesh(path, points, tets);
 			else
-				writer.write_mesh(path, points, elements, true);
+				writer.write_mesh(path, points, elements, true, disc_orders.maxCoeff() == 1);
 		}
 		else
 		{
@@ -1500,6 +1594,9 @@ namespace polyfem::io
 	void OutGeometryData::save_surface(
 		const std::string &export_surface,
 		const State &state,
+		const Eigen::MatrixXd &sol,
+		const Eigen::MatrixXd &pressure,
+		const double t,
 		const double dt_in,
 		const ExportOptions &opts,
 		const bool is_contact_enabled,
@@ -1507,7 +1604,7 @@ namespace polyfem::io
 	{
 
 		const Eigen::VectorXi &disc_orders = state.disc_orders;
-		const Density &density = state.assembler.density();
+		const auto &density = state.assembler.density();
 		const std::vector<basis::ElementBases> &bases = state.bases;
 		const std::vector<basis::ElementBases> &pressure_bases = state.pressure_bases;
 		const std::vector<basis::ElementBases> &gbases = state.geom_bases();
@@ -1521,8 +1618,6 @@ namespace polyfem::io
 		const double epsv = state.args["contact"]["epsv"];
 		const std::shared_ptr<solver::ContactForm> &contact_form = state.solve_data.contact_form;
 		const std::shared_ptr<solver::FrictionForm> &friction_form = state.solve_data.friction_form;
-		const Eigen::MatrixXd &sol = state.sol;
-		const Eigen::MatrixXd &pressure = state.pressure;
 		const assembler::Problem &problem = *state.problem;
 
 		Eigen::MatrixXd boundary_vis_vertices;
@@ -1606,13 +1701,11 @@ namespace polyfem::io
 			io::VTUWriter writer;
 
 			const int problem_dim = mesh.dimension();
-			Eigen::MatrixXd displaced = utils::unflatten(sol, problem_dim);
+			const Eigen::MatrixXd full_displacements = utils::unflatten(sol, problem_dim);
+			const Eigen::MatrixXd surface_displacements = collision_mesh.map_displacements(full_displacements);
+			writer.add_field("solution", surface_displacements);
 
-			Eigen::MatrixXd real_vertices = collision_mesh.vertices(displaced);
-			writer.add_field("solution", real_vertices);
-
-			displaced += boundary_nodes_pos;
-			Eigen::MatrixXd displaced_surface = collision_mesh.vertices(displaced);
+			const Eigen::MatrixXd displaced_surface = collision_mesh.displace_vertices(full_displacements);
 
 			ipc::Constraints constraint_set;
 			constraint_set.build(
@@ -1629,14 +1722,18 @@ namespace polyfem::io
 
 				Eigen::MatrixXd forces_reshaped = utils::unflatten(forces, problem_dim);
 
-				assert(forces_reshaped.rows() == real_vertices.rows());
-				assert(forces_reshaped.cols() == real_vertices.cols());
+				assert(forces_reshaped.rows() == surface_displacements.rows());
+				assert(forces_reshaped.cols() == surface_displacements.cols());
 				writer.add_field("contact_forces", forces_reshaped);
 			}
 
 			if (opts.friction_forces)
 			{
-				Eigen::MatrixXd displaced_surface_prev = (friction_form != nullptr) ? friction_form->displaced_surface_prev() : displaced_surface;
+				Eigen::MatrixXd displaced_surface_prev;
+				if (friction_form != nullptr)
+					displaced_surface_prev = friction_form->displaced_surface_prev();
+				if (displaced_surface_prev.size() == 0)
+					displaced_surface_prev = displaced_surface;
 
 				ipc::FrictionConstraints friction_constraint_set;
 				ipc::construct_friction_constraint_set(
@@ -1655,17 +1752,17 @@ namespace polyfem::io
 
 				Eigen::MatrixXd forces_reshaped = utils::unflatten(forces, problem_dim);
 
-				assert(forces_reshaped.rows() == real_vertices.rows());
-				assert(forces_reshaped.cols() == real_vertices.cols());
+				assert(forces_reshaped.rows() == surface_displacements.rows());
+				assert(forces_reshaped.cols() == surface_displacements.cols());
 				writer.add_field("friction_forces", forces_reshaped);
 			}
 
-			assert(collision_mesh.vertices(boundary_nodes_pos).rows() == real_vertices.rows());
-			assert(collision_mesh.vertices(boundary_nodes_pos).cols() == real_vertices.cols());
+			assert(collision_mesh.vertices_at_rest().rows() == surface_displacements.rows());
+			assert(collision_mesh.vertices_at_rest().cols() == surface_displacements.cols());
 
 			writer.write_mesh(
 				export_surface.substr(0, export_surface.length() - 4) + "_contact.vtu",
-				collision_mesh.vertices(boundary_nodes_pos),
+				collision_mesh.vertices_at_rest(),
 				problem_dim == 3 ? collision_mesh.faces() : collision_mesh.edges());
 		}
 
@@ -1695,38 +1792,25 @@ namespace polyfem::io
 
 		if (opts.material_params)
 		{
-			const LameParameters &params = assembler.lame_params();
+			const auto &params = assembler.parameters(formulation);
 
-			Eigen::MatrixXd lambdas(boundary_vis_vertices.rows(), 1);
-			Eigen::MatrixXd mus(boundary_vis_vertices.rows(), 1);
-			Eigen::MatrixXd Es(boundary_vis_vertices.rows(), 1);
-			Eigen::MatrixXd nus(boundary_vis_vertices.rows(), 1);
+			std::map<std::string, Eigen::MatrixXd> param_val;
+			for (const auto &[p, _] : params)
+				param_val[p] = Eigen::MatrixXd(boundary_vis_vertices.rows(), 1);
 			Eigen::MatrixXd rhos(boundary_vis_vertices.rows(), 1);
 
 			for (int i = 0; i < boundary_vis_vertices.rows(); ++i)
 			{
 				double lambda, mu;
 
-				params.lambda_mu(boundary_vis_local_vertices.row(i), boundary_vis_vertices.row(i), boundary_vis_elements_ids(i), lambda, mu);
-				lambdas(i) = lambda;
-				mus(i) = mu;
-				if (mesh.is_volume())
-				{
-					Es(i) = mu * (3.0 * lambda + 2.0 * mu) / (lambda + mu);
-					nus(i) = lambda / (2.0 * (lambda + mu));
-				}
-				else
-				{
-					Es(i) = 2 * mu * (2.0 * lambda + 2.0 * mu) / (lambda + 2.0 * mu);
-					nus(i) = lambda / (lambda + 2.0 * mu);
-				}
+				for (const auto &[p, func] : params)
+					param_val.at(p)(i) = func(boundary_vis_local_vertices.row(i), boundary_vis_vertices.row(i), t, boundary_vis_elements_ids(i));
+
 				rhos(i) = density(boundary_vis_local_vertices.row(i), boundary_vis_vertices.row(i), boundary_vis_elements_ids(i));
 			}
 
-			writer.add_field("lambda", lambdas);
-			writer.add_field("mu", mus);
-			writer.add_field("E", Es);
-			writer.add_field("nu", nus);
+			for (const auto &[p, tmp] : param_val)
+				writer.add_field(p, tmp);
 			writer.add_field("rho", rhos);
 		}
 
@@ -1755,18 +1839,21 @@ namespace polyfem::io
 	void OutGeometryData::save_wire(
 		const std::string &name,
 		const State &state,
+		const Eigen::MatrixXd &sol,
 		const double t,
 		const ExportOptions &opts,
 		std::vector<SolutionFrame> &solution_frames) const
 	{
 		const std::vector<basis::ElementBases> &gbases = state.geom_bases();
 		const mesh::Mesh &mesh = *state.mesh;
-		const Eigen::MatrixXd &sol = state.sol;
 		const assembler::Problem &problem = *state.problem;
 
 		if (!opts.solve_export_to_file) // TODO?
 			return;
 		const auto &sampler = ref_element_sampler;
+
+		Eigen::MatrixXi vis_faces_poly, vis_edges_poly;
+		Eigen::MatrixXd vis_pts_poly;
 
 		const auto &current_bases = gbases;
 		int seg_total_size = 0;
@@ -1787,8 +1874,19 @@ namespace polyfem::io
 			{
 				pts_total_size += sampler.cube_points().rows();
 				seg_total_size += sampler.cube_edges().rows();
+				faces_total_size += sampler.cube_faces().rows();
 			}
-			// TODO add edges for poly
+			else
+			{
+				if (mesh.is_volume())
+					sampler.sample_polyhedron(state.polys_3d.at(i).first, state.polys_3d.at(i).second, vis_pts_poly, vis_faces_poly, vis_edges_poly);
+				else
+					sampler.sample_polygon(state.polys.at(i), vis_pts_poly, vis_faces_poly, vis_edges_poly);
+
+				pts_total_size += vis_pts_poly.rows();
+				seg_total_size += vis_edges_poly.rows();
+				faces_total_size += vis_faces_poly.rows();
+			}
 		}
 
 		Eigen::MatrixXd points(pts_total_size, mesh.dimension());
@@ -1820,8 +1918,27 @@ namespace polyfem::io
 				edges.block(seg_index, 0, sampler.cube_edges().rows(), edges.cols()) = sampler.cube_edges().array() + pts_index;
 				seg_index += sampler.cube_edges().rows();
 
+				faces.block(face_index, 0, sampler.cube_faces().rows(), 3) = sampler.cube_faces().array() + pts_index;
+				face_index += sampler.cube_faces().rows();
+
 				points.block(pts_index, 0, mapped.rows(), points.cols()) = mapped;
 				pts_index += mapped.rows();
+			}
+			else
+			{
+				if (mesh.is_volume())
+					sampler.sample_polyhedron(state.polys_3d.at(i).first, state.polys_3d.at(i).second, vis_pts_poly, vis_faces_poly, vis_edges_poly);
+				else
+					sampler.sample_polygon(state.polys.at(i), vis_pts_poly, vis_faces_poly, vis_edges_poly);
+
+				edges.block(seg_index, 0, vis_edges_poly.rows(), edges.cols()) = vis_edges_poly.array() + pts_index;
+				seg_index += vis_edges_poly.rows();
+
+				faces.block(face_index, 0, vis_faces_poly.rows(), 3) = vis_faces_poly.array() + pts_index;
+				face_index += vis_faces_poly.rows();
+
+				points.block(pts_index, 0, vis_pts_poly.rows(), points.cols()) = vis_pts_poly;
+				pts_index += vis_pts_poly.rows();
 			}
 		}
 
@@ -1897,6 +2014,56 @@ namespace polyfem::io
 		}
 
 		writer.write_mesh(name, points, edges);
+	}
+
+	void OutGeometryData::save_points(
+		const std::string &path,
+		const State &state,
+		const Eigen::MatrixXd &sol,
+		const ExportOptions &opts,
+		std::vector<SolutionFrame> &solution_frames) const
+	{
+		const auto &dirichlet_nodes = state.dirichlet_nodes;
+		const auto &dirichlet_nodes_position = state.dirichlet_nodes_position;
+		const mesh::Mesh &mesh = *state.mesh;
+		const assembler::Problem &problem = *state.problem;
+
+		int actual_dim = 1;
+		if (!problem.is_scalar())
+			actual_dim = mesh.dimension();
+
+		Eigen::MatrixXd fun(dirichlet_nodes_position.size(), actual_dim);
+		Eigen::MatrixXd b_sidesets(dirichlet_nodes_position.size(), 1);
+		b_sidesets.setZero();
+		Eigen::MatrixXd points(dirichlet_nodes_position.size(), mesh.dimension());
+		std::vector<std::vector<int>> cells(dirichlet_nodes_position.size());
+
+		for (int i = 0; i < dirichlet_nodes_position.size(); ++i)
+		{
+			const int n_id = dirichlet_nodes[i];
+			const auto s_id = mesh.get_node_id(n_id);
+			if (s_id > 0)
+			{
+				b_sidesets(i) = s_id;
+			}
+
+			for (int j = 0; j < actual_dim; ++j)
+			{
+				fun(i, j) = sol(n_id * actual_dim + j);
+			}
+
+			points.row(i) = dirichlet_nodes_position[i];
+			cells[i].push_back(i);
+		}
+
+		io::VTUWriter writer;
+
+		if (opts.solve_export_to_file)
+		{
+			writer.add_field("solution", fun);
+			writer.add_field("sidesets", b_sidesets);
+			writer.write_mesh(path, points, cells, false, false);
+		}
 	}
 
 	void OutGeometryData::save_pvd(
@@ -2141,37 +2308,37 @@ namespace polyfem::io
 				std::string type = "";
 				switch (els_tag[i])
 				{
-				case ElementType::Simplex:
+				case ElementType::SIMPLEX:
 					type = "Simplex";
 					break;
-				case ElementType::RegularInteriorCube:
+				case ElementType::REGULAR_INTERIOR_CUBE:
 					type = "RegularInteriorCube";
 					break;
-				case ElementType::RegularBoundaryCube:
+				case ElementType::REGULAR_BOUNDARY_CUBE:
 					type = "RegularBoundaryCube";
 					break;
-				case ElementType::SimpleSingularInteriorCube:
+				case ElementType::SIMPLE_SINGULAR_INTERIOR_CUBE:
 					type = "SimpleSingularInteriorCube";
 					break;
-				case ElementType::MultiSingularInteriorCube:
+				case ElementType::MULTI_SINGULAR_INTERIOR_CUBE:
 					type = "MultiSingularInteriorCube";
 					break;
-				case ElementType::SimpleSingularBoundaryCube:
+				case ElementType::SIMPLE_SINGULAR_BOUNDARY_CUBE:
 					type = "SimpleSingularBoundaryCube";
 					break;
-				case ElementType::InterfaceCube:
+				case ElementType::INTERFACE_CUBE:
 					type = "InterfaceCube";
 					break;
-				case ElementType::MultiSingularBoundaryCube:
+				case ElementType::MULTI_SINGULAR_BOUNDARY_CUBE:
 					type = "MultiSingularBoundaryCube";
 					break;
-				case ElementType::BoundaryPolytope:
+				case ElementType::BOUNDARY_POLYTOPE:
 					type = "BoundaryPolytope";
 					break;
-				case ElementType::InteriorPolytope:
+				case ElementType::INTERIOR_POLYTOPE:
 					type = "InteriorPolytope";
 					break;
-				case ElementType::Undefined:
+				case ElementType::UNDEFINED:
 					type = "Undefined";
 					break;
 				}
@@ -2385,35 +2552,35 @@ namespace polyfem::io
 
 			switch (type)
 			{
-			case ElementType::Simplex:
+			case ElementType::SIMPLEX:
 				simplex_count++;
 				break;
-			case ElementType::RegularInteriorCube:
+			case ElementType::REGULAR_INTERIOR_CUBE:
 				regular_count++;
 				break;
-			case ElementType::RegularBoundaryCube:
+			case ElementType::REGULAR_BOUNDARY_CUBE:
 				regular_boundary_count++;
 				break;
-			case ElementType::SimpleSingularInteriorCube:
+			case ElementType::SIMPLE_SINGULAR_INTERIOR_CUBE:
 				simple_singular_count++;
 				break;
-			case ElementType::MultiSingularInteriorCube:
+			case ElementType::MULTI_SINGULAR_INTERIOR_CUBE:
 				multi_singular_count++;
 				break;
-			case ElementType::SimpleSingularBoundaryCube:
+			case ElementType::SIMPLE_SINGULAR_BOUNDARY_CUBE:
 				boundary_count++;
 				break;
-			case ElementType::InterfaceCube:
-			case ElementType::MultiSingularBoundaryCube:
+			case ElementType::INTERFACE_CUBE:
+			case ElementType::MULTI_SINGULAR_BOUNDARY_CUBE:
 				multi_singular_boundary_count++;
 				break;
-			case ElementType::BoundaryPolytope:
+			case ElementType::BOUNDARY_POLYTOPE:
 				non_regular_boundary_count++;
 				break;
-			case ElementType::InteriorPolytope:
+			case ElementType::INTERIOR_POLYTOPE:
 				non_regular_count++;
 				break;
-			case ElementType::Undefined:
+			case ElementType::UNDEFINED:
 				undefined_count++;
 				break;
 			}

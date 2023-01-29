@@ -34,7 +34,7 @@ namespace polyfem::solver
 		/// @note This is not marked const because ElasticForm needs to cache the matrix assembly.
 		/// @param[in] x Current solution
 		/// @param[out] hessian Output Hessian of the value wrt x
-		inline void second_derivative(const Eigen::VectorXd &x, StiffnessMatrix &hessian)
+		inline void second_derivative(const Eigen::VectorXd &x, StiffnessMatrix &hessian) const
 		{
 			second_derivative_unweighted(x, hessian);
 			hessian *= weight_;
@@ -84,7 +84,7 @@ namespace polyfem::solver
 		virtual void update_lagging(const Eigen::VectorXd &x, const int iter_num){};
 
 		/// @brief Get the maximum number of lagging iteration allowable.
-		virtual int max_lagging_iterations() const { return std::numeric_limits<int>::max(); }
+		virtual int max_lagging_iterations() const { return 1; }
 
 		/// @brief Does this form require lagging?
 		/// @return True if the form requires lagging
@@ -107,6 +107,9 @@ namespace polyfem::solver
 		/// @brief Determine if the form is enabled
 		/// @return True if the form is enabled else false
 		bool enabled() const { return enabled_; }
+
+		/// @brief Get the form's multiplicative constant weight
+		double weight() const { return weight_; }
 
 		/// @brief Set the form's multiplicative constant weight
 		/// @param weight New weight to use
@@ -143,6 +146,6 @@ namespace polyfem::solver
 		/// @brief Compute the second derivative of the value wrt x
 		/// @param[in] x Current solution
 		/// @param[out] hessian Output Hessian of the value wrt x
-		virtual void second_derivative_unweighted(const Eigen::VectorXd &x, StiffnessMatrix &hessian) = 0;
+		virtual void second_derivative_unweighted(const Eigen::VectorXd &x, StiffnessMatrix &hessian) const = 0;
 	};
 } // namespace polyfem::solver

@@ -89,11 +89,34 @@ int authenticate_json(std::string json_file, const bool allow_append)
 		}
 		args["root_path"] = json_file;
 	}
+	if (json_file.find("navier") == std::string::npos)
+	{
+		if (args.contains("solver"))
+		{
+			if (args["solver"].contains("linear"))
+			{
+				args["solver"]["linear"]["solver"] = "Eigen::SimplicialLDLT";
+			}
+			else
+			{
+				args["solver"]["linear"] = {};
+				args["solver"]["linear"]["solver"] = "Eigen::SimplicialLDLT";
+			}
+		}
+		else
+		{
+			args["solver"] = R"(
+		{"linear": {
+            "solver": "Eigen::SimplicialLDLT"
+        }})"_json;
+		}
+	}
 
-	State state(/*max_threads=*/1);
-	state.init_logger("", spdlog::level::err, false);
+	State state;
+	args["/output/log/level"_json_pointer] = "error";
+	state.init(args, true);
+	state.set_max_threads(1);
 	spdlog::set_level(spdlog::level::info);
-	state.init(args, "");
 	state.load_mesh();
 
 	if (state.mesh == nullptr)
@@ -109,9 +132,12 @@ int authenticate_json(std::string json_file, const bool allow_append)
 	state.assemble_rhs();
 	state.assemble_stiffness_mat();
 
-	state.solve_problem();
+	Eigen::MatrixXd sol;
+	Eigen::MatrixXd pressure;
 
-	state.compute_errors();
+	state.solve_problem(sol, pressure);
+
+	state.compute_errors(sol);
 
 	json out = json({});
 	out["err_l2"] = state.stats.l2_err;

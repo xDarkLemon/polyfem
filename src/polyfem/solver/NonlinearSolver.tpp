@@ -62,9 +62,8 @@ namespace cppoptlib
 		if (std::isnan(first_grad_norm))
 		{
 			this->m_status = Status::UserDefined;
-			polyfem::logger().error("[{}] Initial gradient is nan; stopping", name());
-			m_error_code = ErrorCode::NanEncountered;
-			throw std::runtime_error("Gradient is nan; stopping");
+			m_error_code = ErrorCode::NAN_ENCOUNTERED;
+			log_and_throw_error("[{}] Initial gradient is nan; stopping", name());
 			return;
 		}
 		this->m_current.gradNorm = first_grad_norm / (normalize_gradient ? first_grad_norm : 1);
@@ -77,8 +76,8 @@ namespace cppoptlib
 		{
 			POLYFEM_SCOPED_TIMER("compute objective function", obj_fun_time);
 			this->m_current.fDelta = objFunc.value(x);
-			polyfem::logger().info(
-				"[{}] Not even starting, grad is small enough (f={} ||∇f||={} g={} tol={})",
+			logger().info(
+				"[{}] Not even starting, grad is small enough (f={:g} ||∇f||={:g} g={:g} tol={:g})",
 				name(), this->m_current.fDelta, first_grad_norm, this->m_current.gradNorm, this->m_stop.gradNorm);
 			update_solver_info();
 			return;
@@ -105,9 +104,8 @@ namespace cppoptlib
 			if (!std::isfinite(energy))
 			{
 				this->m_status = Status::UserDefined;
-				polyfem::logger().error("[{}] f(x) is nan or inf; stopping", name());
-				m_error_code = ErrorCode::NanEncountered;
-				throw std::runtime_error("f(x) is nan or inf; stopping");
+				m_error_code = ErrorCode::NAN_ENCOUNTERED;
+				log_and_throw_error("[{}] f(x) is nan or inf; stopping", name());
 				break;
 			}
 
@@ -120,9 +118,8 @@ namespace cppoptlib
 			if (std::isnan(grad_norm))
 			{
 				this->m_status = Status::UserDefined;
-				polyfem::logger().error("[{}] Gradient is nan; stopping", name());
-				m_error_code = ErrorCode::NanEncountered;
-				throw std::runtime_error("Gradient is nan; stopping");
+				m_error_code = ErrorCode::NAN_ENCOUNTERED;
+				log_and_throw_error("[{}] Gradient is nan; stopping", name());
 				break;
 			}
 
@@ -140,9 +137,8 @@ namespace cppoptlib
 			if (grad_norm != 0 && delta_x.dot(grad) >= 0)
 			{
 				increase_descent_strategy();
-				polyfem::logger().log(
-					spdlog::level::debug,
-					"[{}] direction is not a descent direction (Δx⋅g={}≥0); reverting to {}",
+				logger().debug(
+					"[{}] direction is not a descent direction (Δx⋅g={:g}≥0); reverting to {}",
 					name(), delta_x.dot(grad), descent_strategy_name());
 				this->m_status = Status::Continue;
 				continue;
@@ -153,7 +149,7 @@ namespace cppoptlib
 			{
 				increase_descent_strategy();
 				this->m_status = Status::UserDefined;
-				polyfem::logger().debug("[{}] Δx is nan; reverting to {}", name(), descent_strategy_name());
+				logger().debug("[{}] Δx is nan; reverting to {}", name(), descent_strategy_name());
 				this->m_status = Status::Continue;
 				continue;
 			}
@@ -208,14 +204,14 @@ namespace cppoptlib
 			//  if (objFunc.stop(x))
 			//  {
 			//  	this->m_status = Status::UserDefined;
-			//  	m_error_code = ErrorCode::Success;
-			//  	polyfem::logger().debug("[{}] Objective decided to stop", name());
+			//  	m_error_code = ErrorCode::SUCCESS;
+			//  	logger().debug("[{}] Objective decided to stop", name());
 			//  }
 
 			objFunc.post_step(this->m_current.iterations, x);
 
-			polyfem::logger().debug(
-				"[{}] iter={:} f={} ‖∇f‖={} ‖Δx‖={} Δx⋅∇f(x)={} g={} tol={} rate={} ‖step‖={}",
+			logger().debug(
+				"[{}] iter={:d} f={:g} ‖∇f‖={:g} ‖Δx‖={:g} Δx⋅∇f(x)={:g} g={:g} tol={:g} rate={:g} ‖step‖={:g}",
 				name(), this->m_current.iterations, energy, grad_norm, delta_x_norm, delta_x.dot(grad),
 				this->m_current.gradNorm, this->m_stop.gradNorm, rate, step);
 			++this->m_current.iterations;
@@ -227,33 +223,17 @@ namespace cppoptlib
 		// Log results
 		// -----------
 
-		std::string msg = "Finished";
-		spdlog::level::level_enum level = spdlog::level::info;
 		if (this->m_status == Status::IterationLimit)
-		{
-			const std::string msg = fmt::format("[{}] Reached iteration limit", name());
-			polyfem::logger().error(msg);
-			throw std::runtime_error(msg);
-			level = spdlog::level::err;
-		}
-		else if (this->m_current.iterations == 0)
-		{
-			const std::string msg = fmt::format("[{}] Unable to take a step", name());
-			polyfem::logger().error(msg);
-			throw std::runtime_error(msg);
-			level = this->m_status == Status::UserDefined ? spdlog::level::err : spdlog::level::warn;
-		}
-		else if (this->m_status == Status::UserDefined)
-		{
-			const std::string msg = fmt::format("[{}] Failed to find minimizer", name());
-			polyfem::logger().error(msg);
-			throw std::runtime_error(msg);
-			level = spdlog::level::err;
-		}
-		polyfem::logger().log(
-			level, "[{}] {}, took {}s (niters={} f={} ||∇f||={} ||Δx||={} Δx⋅∇f(x)={} g={} tol={})",
-			name(), msg, timer.getElapsedTimeInSec(), this->m_current.iterations, old_energy, grad.norm(), delta_x.norm(),
-			delta_x.dot(grad), this->m_current.gradNorm, this->m_stop.gradNorm);
+			log_and_throw_error("[{}] Reached iteration limit", name());
+		if (this->m_current.iterations == 0)
+			log_and_throw_error("[{}] Unable to take a step", name());
+		if (this->m_status == Status::UserDefined)
+			log_and_throw_error("[{}] Failed to find minimizer", name());
+
+		logger().info(
+			"[{}] Finished, took {:g}s (niters={:d} f={:g} ||∇f||={:g} ||Δx||={:g} Δx⋅∇f(x)={:g} g={:g} tol={:g}). {}",
+			name(), timer.getElapsedTimeInSec(), this->m_current.iterations, old_energy, grad.norm(), delta_x.norm(),
+			delta_x.dot(grad), this->m_current.gradNorm, this->m_stop.gradNorm, this->m_status);
 
 		log_times();
 		update_solver_info();
@@ -292,7 +272,7 @@ namespace cppoptlib
 	{
 		this->m_current.reset();
 		descent_strategy = default_descent_strategy();
-		m_error_code = ErrorCode::Success;
+		m_error_code = ErrorCode::SUCCESS;
 
 		const std::string line_search_name = solver_info["line_search"];
 		solver_info = polyfem::json();
@@ -367,12 +347,13 @@ namespace cppoptlib
 	void NonlinearSolver<ProblemType>::log_times()
 	{
 		polyfem::logger().debug(
-			"[timing] grad {:.3g}s, assembly {:.3g}s, inverting {:.3g}s, checking_direction {:.3g}s, "
+			"[{}] grad {:.3g}s, assembly {:.3g}s, inverting {:.3g}s, "
 			"line_search {:.3g}s, constraint_set_update {:.3g}s, "
 			"obj_fun {:.3g}s, checking_for_nan_inf {:.3g}s, "
 			"broad_phase_ccd {:.3g}s, ccd {:.3g}s, "
 			"classical_line_search {:.3g}s",
-			grad_time, assembly_time, inverting_time, checking_direction_time, line_search_time,
+			fmt::format(fmt::fg(fmt::terminal_color::magenta), "timing"),
+			grad_time, assembly_time, inverting_time, line_search_time,
 			constraint_set_update_time + (m_line_search ? m_line_search->constraint_set_update_time : 0),
 			obj_fun_time, m_line_search ? m_line_search->checking_for_nan_inf_time : 0,
 			m_line_search ? m_line_search->broad_phase_ccd_time : 0, m_line_search ? m_line_search->ccd_time : 0,

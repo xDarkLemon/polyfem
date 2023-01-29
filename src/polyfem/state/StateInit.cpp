@@ -28,6 +28,26 @@
 
 #include <sstream>
 
+namespace spdlog::level
+{
+	NLOHMANN_JSON_SERIALIZE_ENUM(
+		spdlog::level::level_enum,
+		{{spdlog::level::level_enum::trace, "trace"},
+		 {spdlog::level::level_enum::debug, "debug"},
+		 {spdlog::level::level_enum::info, "info"},
+		 {spdlog::level::level_enum::warn, "warning"},
+		 {spdlog::level::level_enum::err, "error"},
+		 {spdlog::level::level_enum::critical, "critical"},
+		 {spdlog::level::level_enum::off, "off"},
+		 {spdlog::level::level_enum::trace, 0},
+		 {spdlog::level::level_enum::debug, 1},
+		 {spdlog::level::level_enum::info, 2},
+		 {spdlog::level::level_enum::warn, 3},
+		 {spdlog::level::level_enum::err, 3},
+		 {spdlog::level::level_enum::critical, 4},
+		 {spdlog::level::level_enum::off, 5}})
+}
+
 namespace polyfem
 {
 	using namespace problem;
@@ -81,7 +101,7 @@ namespace polyfem
 		};
 	} // namespace
 
-	State::State(const unsigned int max_threads)
+	State::State()
 	{
 		using namespace polysolve;
 #ifndef WIN32
@@ -89,12 +109,6 @@ namespace polyfem
 #endif
 
 		GEO::initialize();
-		const unsigned int num_threads = std::max(1u, std::min(max_threads, std::thread::hardware_concurrency()));
-		NThread::get().num_threads = num_threads;
-#ifdef POLYFEM_WITH_TBB
-		thread_limiter = std::make_shared<tbb::global_control>(tbb::global_control::max_allowed_parallelism, num_threads);
-#endif
-		Eigen::setNbThreads(num_threads);
 
 		// Import standard command line arguments, and custom ones
 		GEO::CmdLine::import_arg_group("standard");
@@ -141,7 +155,7 @@ namespace polyfem
 		ipc::logger().set_level(log_level);
 	}
 
-	void State::init(const json &p_args_in, const bool strict_validation, const std::string &output_dir, const bool fallback_solver)
+	void State::init(const json &p_args_in, const bool strict_validation)
 	{
 		json args_in = p_args_in; // mutable copy
 
@@ -179,19 +193,6 @@ namespace polyfem
 			}
 		}
 
-		// // Fallback to default linear solver if the specified solver is invalid
-		if (fallback_solver && args_in.contains("/solver/linear/solver"_json_pointer))
-		{
-			const std::string s_json = args_in["solver"]["linear"]["solver"];
-			const auto ss = polysolve::LinearSolver::availableSolvers();
-			const auto solver_found = std::find(ss.begin(), ss.end(), s_json);
-			if (solver_found == ss.end())
-			{
-				logger().warn("Solver {} is invalid, falling back to {}", s_json, polysolve::LinearSolver::defaultSolver());
-				args_in["solver"]["linear"]["solver"] = polysolve::LinearSolver::defaultSolver();
-			}
-		}
-
 		const bool valid_input = jse.verify_json(args_in, rules);
 
 		if (!valid_input)
@@ -203,7 +204,31 @@ namespace polyfem
 
 		this->args = jse.inject_defaults(args_in, rules);
 
-		// std::cout << this->args.dump() << std::endl;
+		const bool fallback_solver = this->args["solver"]["linear"]["enable_overwrite_solver"];
+		// Fallback to default linear solver if the specified solver is invalid
+		if (fallback_solver)
+		{
+			const std::string s_json = this->args["solver"]["linear"]["solver"];
+			const auto ss = polysolve::LinearSolver::availableSolvers();
+			const auto solver_found = std::find(ss.begin(), ss.end(), s_json);
+			if (solver_found == ss.end())
+			{
+				logger().warn("Solver {} is invalid, falling back to {}", s_json, polysolve::LinearSolver::defaultSolver());
+				this->args["solver"]["linear"]["solver"] = polysolve::LinearSolver::defaultSolver();
+			}
+		}
+
+		std::string out_path_log = this->args["output"]["log"]["path"];
+		if (!out_path_log.empty())
+		{
+			out_path_log = resolve_output_path(out_path_log);
+		}
+
+		spdlog::level::level_enum log_level = this->args["output"]["log"]["level"];
+		init_logger(out_path_log, log_level, this->args["output"]["log"]["quiet"]);
+
+		const unsigned int thread_in = this->args["solver"]["max_threads"];
+		set_max_threads(thread_in <= 0 ? std::numeric_limits<unsigned int>::max() : thread_in);
 
 		has_dhat = args_in["contact"].contains("dhat");
 
@@ -245,7 +270,10 @@ namespace polyfem
 				problem->set_parameters(tmp);
 			}
 			// important for the BC
-			problem->set_parameters(args["boundary_conditions"]);
+
+			auto bc = args["boundary_conditions"];
+			bc["root_path"] = root_path();
+			problem->set_parameters(bc);
 			problem->set_parameters(args["initial_conditions"]);
 
 			problem->set_parameters(args["output"]);
@@ -267,14 +295,24 @@ namespace polyfem
 			problem->set_parameters(args["preset_problem"]);
 		}
 
-		// TODO:
-		// if (args["use_spline"] && args["n_refs"] == 0)
-		// {
-		// 	logger().warn("n_refs > 0 with spline");
-		// }
-
 		// Save output directory and resolve output paths dynamically
+		const std::string output_dir = resolve_input_path(this->args["output"]["directory"]);
+		logger().info("Saving output to {}", output_dir);
+		if (!output_dir.empty())
+		{
+			std::filesystem::create_directories(output_dir);
+		}
 		this->output_dir = output_dir;
+	}
+
+	void State::set_max_threads(const unsigned int max_threads)
+	{
+		const unsigned int num_threads = std::max(1u, std::min(max_threads, std::thread::hardware_concurrency()));
+		NThread::get().num_threads = num_threads;
+#ifdef POLYFEM_WITH_TBB
+		thread_limiter = std::make_shared<tbb::global_control>(tbb::global_control::max_allowed_parallelism, num_threads);
+#endif
+		Eigen::setNbThreads(num_threads);
 	}
 
 	void State::init_time()

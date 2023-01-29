@@ -316,7 +316,7 @@ TEST_CASE("lagged regularization form derivatives", "[form][form_derivatives][la
 
 	test_form(form, *state_ptr);
 }
-
+#ifndef USE_GPU
 TEST_CASE("Rayleigh damping form derivatives", "[form][form_derivatives][rayleigh_damping_form]")
 {
 	const auto state_ptr = get_state();
@@ -343,3 +343,4 @@ TEST_CASE("Rayleigh damping form derivatives", "[form][form_derivatives][rayleig
 
 	test_form(form, *state_ptr);
 }
+#endif

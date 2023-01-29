@@ -147,13 +147,10 @@ if(IPC_TOOLKIT_WITH_CUDA OR POLYSOLVE_WITH_CUSOLVER OR WITH_GPU)
     endif()
 
     set_target_properties(polyfem PROPERTIES CUDA_ARCHITECTURES "70;75;86")
-    target_link_libraries(${PROJECT_NAME}_bin
-        PUBLIC
+    target_link_libraries(polyfem PUBLIC
         -lcublas
         -lcurand
-        ${CUDA_cusparse_LIBRARY}
-    )
-    target_link_libraries(polyfem PUBLIC ${CUDA_cusparse_LIBRARY})
+        ${CUDA_cusparse_LIBRARY})
 
     # set_target_properties(PolyFEM_bin PROPERTIES CUDA_ARCHITECTURES "70;75;86")
 endif()

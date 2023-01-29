@@ -205,7 +205,8 @@ namespace polyfem
 
 			std::map<std::string, ParamFunc> parameters(const std::string &assembler) const;
 
-			// const LameParameters &lame_params() const { return linear_elasticity_.local_assembler().lame_params(); }
+			// still needed for sending data to GPU
+			const LameParameters &lame_params() const { return linear_elasticity_.local_assembler().lame_params(); }
 			const Density &density() const { return mass_mat_.local_assembler().density(); }
 
 			// checks if assembler is linear

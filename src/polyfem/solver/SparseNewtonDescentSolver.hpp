@@ -26,8 +26,7 @@ namespace cppoptlib
 		bool compute_update_direction(ProblemType &objFunc, const TVector &x, const TVector &grad, TVector &direction) override;
 
 		void assemble_hessian(ProblemType &objFunc, const TVector &x, polyfem::StiffnessMatrix &hessian);
-		bool solve_linear_system(const polyfem::StiffnessMatrix &hessian, const TVector &grad, TVector &direction);
-		bool solve_linear_system_petsc(polyfem::StiffnessMatrix &hessian, const TVector &grad, TVector &direction);
+		bool solve_linear_system(polyfem::StiffnessMatrix &hessian, const TVector &grad, TVector &direction);
 		bool check_direction(const polyfem::StiffnessMatrix &hessian, const TVector &grad, const TVector &direction);
 		bool check_direction_gpu(const polyfem::StiffnessMatrix &hessian, const Eigen::Matrix<double, -1, 1> &grad, const Eigen::Matrix<double, -1, 1> &direction);
 
@@ -61,6 +60,7 @@ namespace cppoptlib
 
 		std::unique_ptr<polysolve::LinearSolver> linear_solver; ///< Linear solver used to solve the linear system
 		double reg_weight = 0;                                  ///< Regularization Coefficients
+		double its_petsc = 0;                                   ///< Checks if PETSC is going to be used
 
 		// ====================================================================
 		//                            Solver info

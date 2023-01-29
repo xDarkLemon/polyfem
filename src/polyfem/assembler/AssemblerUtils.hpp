@@ -22,7 +22,9 @@
 #include "NavierStokes.hpp"
 #include "IncompressibleLinElast.hpp"
 
+#ifdef USE_GPU
 #include <polyfem/utils/CUDA_utilities.cuh>
+#endif
 
 #include <polyfem/utils/MatrixUtils.hpp>
 

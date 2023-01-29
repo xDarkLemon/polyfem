@@ -5,11 +5,6 @@
 #include <polyfem/mesh/Obstacle.hpp>
 
 #ifdef USE_GPU
-#include <thrust/functional.h>
-#include <thrust/reduce.h>
-#include <thrust/device_vector.h>
-#include <thrust/copy.h>
-#include <thrust/host_vector.h>
 #include <polyfem/utils/CUDA_utilities.cuh>
 #endif
 

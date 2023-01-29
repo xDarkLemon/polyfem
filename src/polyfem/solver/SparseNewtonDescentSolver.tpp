@@ -11,6 +11,10 @@ namespace cppoptlib
 	{
 		linear_solver = polysolve::LinearSolver::create(
 			linear_solver_params["solver"], linear_solver_params["precond"]);
+#ifdef POLYSOLVE_WITH_PETSC
+		if (linear_solver_params["solver"] == "PETSC_Solver")
+			its_petsc = 1;
+#endif
 		linear_solver->setParameters(linear_solver_params);
 	}
 
@@ -76,13 +80,8 @@ namespace cppoptlib
 
 		assemble_hessian(objFunc, x, hessian);
 
-#ifdef POLYSOLVE_WITH_PETSC
-		if (!solve_linear_system_petsc(hessian, grad, direction))
-			return compute_update_direction(objFunc, x, grad, direction);
-#else
 		if (!solve_linear_system(hessian, grad, direction))
 			return compute_update_direction(objFunc, x, grad, direction);
-#endif
 
 #ifdef USE_NONLINEAR_GPU
 		if (!check_direction_gpu(hessian, grad, direction))
@@ -131,41 +130,11 @@ namespace cppoptlib
 
 	template <typename ProblemType>
 	bool SparseNewtonDescentSolver<ProblemType>::solve_linear_system(
-		const polyfem::StiffnessMatrix &hessian, const TVector &grad, TVector &direction)
+		polyfem::StiffnessMatrix &hessian, const TVector &grad, TVector &direction)
 	{
 		POLYFEM_SCOPED_TIMER("linear solve", this->inverting_time);
 		// TODO: get the correct size
 		linear_solver->analyzePattern(hessian, hessian.rows());
-
-		try
-		{
-			linear_solver->factorize(hessian);
-		}
-		catch (const std::runtime_error &err)
-		{
-			increase_descent_strategy();
-
-			// warn if using gradient descent
-			polyfem::logger().log(
-				log_level(), "Unable to factorize Hessian: \"{}\"; reverting to {}",
-				err.what(), this->descent_strategy_name());
-
-			// polyfem::write_sparse_matrix_csv("problematic_hessian.csv", hessian);
-			return false;
-		}
-
-		linear_solver->solve(-grad, direction); // H Δx = -g
-
-		return true;
-	}
-
-	// =======================================================================
-
-	template <typename ProblemType>
-	bool SparseNewtonDescentSolver<ProblemType>::solve_linear_system_petsc(
-		polyfem::StiffnessMatrix &hessian, const TVector &grad, TVector &direction)
-	{
-		POLYFEM_SCOPED_TIMER("linear solve", this->inverting_time);
 
 		// Initializes linear solver for PETSC
 		// TODO: To create a manager for choosing the external linear solver by using json
@@ -180,11 +149,17 @@ namespace cppoptlib
 		4 = CUSPARSE
 		5 = STRUMPACK
 		6 = HYPRE // NOT FULLY IMPLEMENTED YET
-		(ANY)DEFAULT = PETSC NATIVE SOLVER
+		(ANY)DEFAULT - 99 = PETSC NATIVE SOLVER
 		*/
+
 		try
 		{
-			linear_solver->factorize(hessian, 0, 99);
+			if (!its_petsc)
+				linear_solver->factorize(hessian);
+#ifdef POLYSOLVE_WITH_PETSC
+			else
+				linear_solver->factorize(hessian, 0, 99);
+#endif
 		}
 		catch (const std::runtime_error &err)
 		{

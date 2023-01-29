@@ -10,8 +10,8 @@ message(STATUS "Third-party: creating target 'ipc::toolkit'")
 include(FetchContent)
 FetchContent_Declare(
     ipc_toolkit
-    GIT_REPOSITORY https://github.com/AlexTru96/ipc-toolkit
-    GIT_TAG d54efbf97de0870fda8d8b44bece8a8a9d253fd2
+    GIT_REPOSITORY https://github.com/ipc-sim/ipc-toolkit.git
+    GIT_TAG 4a1d22e67037c3998eb01757f7d40e8116558b1e
     GIT_SHALLOW FALSE
 )
 FetchContent_MakeAvailable(ipc_toolkit)

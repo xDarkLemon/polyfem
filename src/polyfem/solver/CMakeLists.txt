@@ -13,7 +13,8 @@ set(SOURCES
 	NonlinearSolver.tpp
 	OperatorSplittingSolver.hpp
 	OperatorSplittingSolver.cpp
-	SparseNewtonDescentSolver.cu
+	SolveData.cpp
+	SolveData.hpp
 	SparseNewtonDescentSolver.hpp
 	SparseNewtonDescentSolver.tpp
 	TransientNavierStokesSolver.cpp
@@ -28,9 +29,8 @@ prepend_current_path(SOURCES)
 polyfem_set_source_group(${SOURCES})
 target_sources(polyfem PRIVATE ${SOURCES})
 
-################################################################################
+# ###############################################################################
 # Subfolders
-################################################################################
-
+# ###############################################################################
 add_subdirectory(line_search)
 add_subdirectory(forms)

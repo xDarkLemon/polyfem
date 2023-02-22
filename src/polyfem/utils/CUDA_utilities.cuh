@@ -1,6 +1,7 @@
 #pragma once
 #include <cuda.h>
 #include <cuda_runtime.h>
+#include "cusparse.h"
 #include <stdio.h>
 
 // Thrust utilities
@@ -76,6 +77,16 @@ void COPYDATATOGPU(X *d_A, const X *A, int _size)
 		printf("Error copying to GPU\n");
 		abort();
 	}
+}
+
+template <typename A>
+void EigenSparseToCuSparseTranspose(const Eigen::SparseMatrix<double> &mat, int *row, int *col, A *val)
+{
+	const int num_non0 = mat.nonZeros();
+	const int num_outer = mat.cols() + 1;
+	cudaMemcpy(row, mat.outerIndexPtr(), sizeof(int) * num_outer, cudaMemcpyHostToDevice);
+	cudaMemcpy(col, mat.innerIndexPtr(), sizeof(int) * num_non0, cudaMemcpyHostToDevice);
+	cudaMemcpy(val, mat.valuePtr(), sizeof(A) * num_non0, cudaMemcpyHostToDevice);
 }
 
 template <typename T>

@@ -1,18 +1,7 @@
 #pragma once
 
-#include <polyfem/Common.hpp>
-#include <polyfem/utils/Logger.hpp>
-#include <polyfem/utils/Timer.hpp>
-#include <polyfem/Common.hpp>
-#include "NonlinearSolver.hpp"
-#include <polysolve/LinearSolver.hpp>
-#include <polyfem/utils/MatrixUtils.hpp>
-
 #include "SparseNewtonDescentSolver.hpp"
 
-#include <polyfem/solver/NLProblem.hpp>
-#include <polyfem/solver/FullNLProblem.hpp>
-#include <polyfem/solver/SparseNewtonDescentSolver.hpp>
 #include "polyfem/utils/CUDA_utilities.cuh"
 
 #include <cuda.h>

@@ -7,24 +7,28 @@ set(SOURCES
 	BoundarySampler.cpp
 	BoundarySampler.hpp
 	CUDA_utilities.cuh
-	Selection.cpp
-	Selection.hpp
+	ClipperUtils.cpp
+	ClipperUtils.hpp
 	DisableWarnings.hpp
 	EdgeSampler.cpp
 	EdgeSampler.hpp
 	ElasticityUtils.cpp
 	ElasticityUtils.hpp
 	EnableWarnings.hpp
+	ExpressionValue.cpp
+	ExpressionValue.hpp
+	GeometryUtils.cpp
+	GeometryUtils.hpp
 	getRSS.c
 	HashUtils.hpp
-	Logger.cpp
-	Logger.hpp
 	InterpolatedFunction.cpp
 	InterpolatedFunction.hpp
 	Interpolation.cpp
 	Interpolation.hpp
 	JSONUtils.cpp
 	JSONUtils.hpp
+	Logger.cpp
+	Logger.hpp
 	MatrixUtils.cpp
 	MatrixUtils.hpp
 	MaybeParallelFor.hpp
@@ -37,10 +41,10 @@ set(SOURCES
 	RBFInterpolation.hpp
 	RefElementSampler.cpp
 	RefElementSampler.hpp
+	Selection.cpp
+	Selection.hpp
 	StringUtils.cpp
 	StringUtils.hpp
-	ExpressionValue.cpp
-	ExpressionValue.hpp
 	Timer.hpp
 	Types.hpp
 )

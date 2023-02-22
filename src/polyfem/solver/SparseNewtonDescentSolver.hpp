@@ -18,7 +18,7 @@ namespace cppoptlib
 		using typename Superclass::Scalar;
 		using typename Superclass::TVector;
 
-		SparseNewtonDescentSolver(const json &solver_params, const json &linear_solver_params);
+		SparseNewtonDescentSolver(const json &solver_params, const json &linear_solver_params, const double dt);
 
 		std::string name() const override { return "Newton"; }
 
@@ -28,8 +28,9 @@ namespace cppoptlib
 		void assemble_hessian(ProblemType &objFunc, const TVector &x, polyfem::StiffnessMatrix &hessian);
 		bool solve_linear_system(polyfem::StiffnessMatrix &hessian, const TVector &grad, TVector &direction);
 		bool check_direction(const polyfem::StiffnessMatrix &hessian, const TVector &grad, const TVector &direction);
+#ifdef USE_NONLINEAR_GPU
 		bool check_direction_gpu(const polyfem::StiffnessMatrix &hessian, const Eigen::Matrix<double, -1, 1> &grad, const Eigen::Matrix<double, -1, 1> &direction);
-
+#endif
 		static bool has_hessian_nans(const polyfem::StiffnessMatrix &hessian);
 
 		// ====================================================================
@@ -47,7 +48,7 @@ namespace cppoptlib
 
 		void reset(const int ndof) override;
 
-		virtual int default_descent_strategy() override { return 0; }
+		virtual int default_descent_strategy() override { return force_psd_projection ? 1 : 0; }
 		void increase_descent_strategy() override;
 
 		using Superclass::descent_strategy_name;
@@ -59,6 +60,7 @@ namespace cppoptlib
 		}
 
 		std::unique_ptr<polysolve::LinearSolver> linear_solver; ///< Linear solver used to solve the linear system
+		bool force_psd_projection = false;                      ///< Whether to force the Hessian to be positive semi-definite
 		double reg_weight = 0;                                  ///< Regularization Coefficients
 		double its_petsc = 0;                                   ///< Checks if PETSC is going to be used
 

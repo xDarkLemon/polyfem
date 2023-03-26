@@ -80,8 +80,8 @@ namespace polyfem
 		__global__ void compute_energy_gpu_aux(double *displacement,
 											   Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, 0, 3, 3> *jac_it_array,
 											   Local2Global_GPU *global_data,
-											   Eigen::Matrix<double, -1, 1, 0, 3, 1> *da,
-											   Eigen::Matrix<double, -1, -1, 0, 3, 3> *grad,
+											   Eigen::Matrix<double, -1, 1, 0, 6, 1> *da,
+											   Eigen::Matrix<double, -1, -1, 0, 6, 3> *grad_v,
 											   int n_bases,
 											   int n_loc_bases,
 											   int global_vector_size,
@@ -126,7 +126,7 @@ namespace polyfem
 						{
 							for (int c = 0; c < _size; ++c)
 							{
-								double val_grad = grad[b_index * n_loc_bases * n_pts + i * n_pts + p](c);
+								double val_grad = grad_v[b_index * n_loc_bases + i].row(p)(c);
 								def_grad(d, c) += val_grad * local_dispv(i * _size + d);
 							}
 						}
@@ -157,8 +157,8 @@ namespace polyfem
 															 double *displacement,
 															 Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, 0, 3, 3> *jac_it_array,
 															 Local2Global_GPU *global_data,
-															 Eigen::Matrix<double, -1, 1, 0, 3, 1> *da,
-															 Eigen::Matrix<double, -1, -1, 0, 3, 3> *grad_v,
+															 Eigen::Matrix<double, -1, 1, 0, 6, 1> *da,
+															 Eigen::Matrix<double, -1, -1, 0, 6, 3> *grad_v,
 															 int n_bases,
 															 int n_loc_bases,
 															 int global_vector_size,
@@ -197,7 +197,10 @@ namespace polyfem
 					Eigen::Matrix<double, n_basis, dim> grad(n_loc_bases, size_);
 					for (size_t i = 0; i < n_loc_bases; ++i)
 					{
-						grad.row(i) = grad_v[b_index * n_loc_bases * n_pts + i * n_pts].col(p);
+						if (n_loc_bases == 4 || n_loc_bases == 3)
+							grad.row(i) = grad_v[b_index * n_loc_bases + i].col(p);
+						else
+							grad.row(i) = grad_v[b_index * n_loc_bases + i].row(p);
 					}
 					Eigen::Matrix<double, dim, dim> jac_it;
 					for (long k = 0; k < jac_it.size(); ++k)
@@ -281,8 +284,8 @@ namespace polyfem
 															double *displacement,
 															Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, 0, 3, 3> *jac_it_array,
 															Local2Global_GPU *global_data,
-															Eigen::Matrix<double, -1, 1, 0, 3, 1> *da,
-															Eigen::Matrix<double, -1, -1, 0, 3, 3> *grad_v,
+															Eigen::Matrix<double, -1, 1, 0, 6, 1> *da,
+															Eigen::Matrix<double, -1, -1, 0, 6, 3> *grad_v,
 															int n_bases,
 															int partial_bases,
 															int n_loc_bases,
@@ -330,8 +333,12 @@ namespace polyfem
 					Eigen::Matrix<double, n_basis, dim> grad(n_loc_bases, size_);
 					for (size_t i = 0; i < n_loc_bases; ++i)
 					{
-						// grad.row(i) = grad_v[b_index * n_loc_bases * n_pts + i * n_pts].row(p); //ORIGINAL
-						grad.row(i) = grad_v[b_index * n_loc_bases * n_pts + i * n_pts].col(p);
+						if (n_loc_bases == 4 || n_loc_bases == 3)
+							grad.row(i) = grad_v[b_index * n_loc_bases + i].col(p); // WORKS ONLY FOR LINEAR, MAYBE WE SHOULD FIND ANOTHER WAY
+						else
+							grad.row(i) = grad_v[b_index * n_loc_bases + i].row(p);
+
+						//							grad_v[b_index * n_loc_bases + i].resize(1, 3);
 					}
 					Eigen::Matrix<double, dim, dim> jac_it;
 					for (long k = 0; k < jac_it.size(); ++k)
@@ -451,8 +458,8 @@ namespace polyfem
 		double NeoHookeanElasticity::compute_energy_gpu(double *displacement_dev_ptr,
 														Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, 0, 3, 3> *jac_it_dev_ptr,
 														Local2Global_GPU *global_data_dev_ptr,
-														Eigen::Matrix<double, -1, 1, 0, 3, 1> *da_dev_ptr,
-														Eigen::Matrix<double, -1, -1, 0, 3, 3> *grad_dev_ptr,
+														Eigen::Matrix<double, -1, 1, 0, 6, 1> *da_dev_ptr,
+														Eigen::Matrix<double, -1, -1, 0, 6, 3> *grad_dev_ptr,
 														int n_bases,
 														int n_loc_bases,
 														int global_vector_size,
@@ -515,8 +522,8 @@ namespace polyfem
 		NeoHookeanElasticity::assemble_grad_GPU(double *displacement_dev_ptr,
 												Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, 0, 3, 3> *jac_it_dev_ptr,
 												Local2Global_GPU *global_data_dev_ptr,
-												Eigen::Matrix<double, -1, 1, 0, 3, 1> *da_dev_ptr,
-												Eigen::Matrix<double, -1, -1, 0, 3, 3> *grad_dev_ptr,
+												Eigen::Matrix<double, -1, 1, 0, 6, 1> *da_dev_ptr,
+												Eigen::Matrix<double, -1, -1, 0, 6, 3> *grad_dev_ptr,
 												int n_bases,
 												int n_loc_bases,
 												int global_vector_size,
@@ -581,8 +588,8 @@ namespace polyfem
 		NeoHookeanElasticity::assemble_hessian_GPU(double *displacement_dev_ptr,
 												   Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, 0, 3, 3> *jac_it_dev_ptr,
 												   Local2Global_GPU *global_data_dev_ptr,
-												   Eigen::Matrix<double, -1, 1, 0, 3, 1> *da_dev_ptr,
-												   Eigen::Matrix<double, -1, -1, 0, 3, 3> *grad_dev_ptr,
+												   Eigen::Matrix<double, -1, 1, 0, 6, 1> *da_dev_ptr,
+												   Eigen::Matrix<double, -1, -1, 0, 6, 3> *grad_dev_ptr,
 												   int n_bases,
 												   int n_loc_bases,
 												   int global_vector_size,

@@ -143,10 +143,10 @@ namespace polyfem
 
 		Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, 0, 3, 3> *jac_it_dev_ptr;
 		basis::Local2Global_GPU *global_data_dev_ptr;
-		Eigen::Matrix<double, -1, 1, 0, 3, 1> *da_dev_ptr;
-		Eigen::Matrix<double, -1, 1, 0, 3, 1> *val_dev_ptr;
-		Eigen::Matrix<double, -1, -1, 0, 3, 3> *grad_dev_ptr;
-		Eigen::Matrix<double, -1, -1, 0, 3, 3> *forces_dev_ptr;
+		Eigen::Matrix<double, -1, 1, 0, 6, 1> *da_dev_ptr;
+		Eigen::Matrix<double, -1, 1, 0, 6, 1> *val_dev_ptr;
+		Eigen::Matrix<double, -1, -1, 0, 6, 3> *grad_dev_ptr;
+		Eigen::Matrix<double, -1, -1, 0, 6, 3> *forces_dev_ptr;
 		double *mu_ptr;
 		double *lambda_ptr;
 		double *rho_ptr;

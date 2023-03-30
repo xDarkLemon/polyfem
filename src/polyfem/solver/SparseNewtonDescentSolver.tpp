@@ -3,7 +3,7 @@
 #include "SparseNewtonDescentSolver.hpp"
 
 #ifdef USE_GPU
-#include "polyfem/utils/CUDA_utilities.cuh"
+#include "polyfem/utils/CuSparseUtils.cuh"
 #endif
 
 namespace cppoptlib
@@ -230,50 +230,37 @@ namespace cppoptlib
 		const Eigen::Matrix<double, -1, 1> &grad,
 		const Eigen::Matrix<double, -1, 1> &direction)
 	{
-		POLYFEM_SCOPED_TIMER("checking direction", this->checking_direction_time);
+		POLYFEM_SCOPED_TIMER("check direction", this->checking_direction_time);
+
 		int N = hessian.cols();
 
-		double *hessian_dev, *direction_dev, *grad_dev, *tmp_dev, *res_dev; // to compute residual
-		double *grad_grad_dev, *grad_direc_dev;                             // to compute grad norm and grad dot direction
+		double *hessian_dev, *direction_dev, *grad_dev, *tmp_dev, *residual_dev; // to compute residual
+		double *grad_norm_dev, *grad_dir_dot_dev;                                // to compute grad norm and grad dot direction
 
-		const double *direction_host = direction.data();
-		const double *grad_host = grad.data();
-		double *tmp_host = new double[N];
-		double *res_host = new double[1];
-		double *grad_grad_host = new double[1];
-		double *grad_direc_host = new double[1];
+		double *residual_h = new double[1];
+		double *grad_dir_dot_h = new double[1];
+		double *grad_norm_h = new double[1];
 
-		double alpha = 1.0;
-		double beta = 1.0; // 0.0 for cublas
-
-		const int non0 = hessian.nonZeros();
-		polyfem::logger().trace("non0: {}, cols: {}, rows: {}, allocating size: {} bytes", non0, hessian.cols(), hessian.rows(), non0 * sizeof(double));
-		// std::cout << "non0: " << non0 << " , cols: "<< hessian.cols() <<  ", rows: " << hessian.rows() << ", allocating size : " << non0*sizeof(double) << " bytes" << std::endl;
-		int *row_dev;
-		int *col_dev;
-		row_dev = ALLOCATE_GPU<int>(row_dev, (N + 1) * sizeof(int));
-		col_dev = ALLOCATE_GPU<int>(col_dev, non0 * sizeof(int));
-		hessian_dev = ALLOCATE_GPU<double>(hessian_dev, non0 * sizeof(double));
-		EigenSparseToCuSparseTranspose(hessian, row_dev, col_dev, hessian_dev);
-
-		int *row_host = new int[N + 1];
-		int *col_host = new int[non0];
-		double *hessian_host = new double[non0];
-		COPYDATATOHOST<int>(row_host, row_dev, (N + 1) * sizeof(int));
-		COPYDATATOHOST<int>(col_host, col_dev, (non0) * sizeof(int));
-		COPYDATATOHOST<double>(hessian_host, hessian_dev, (non0) * sizeof(double));
-		int base = row_host[N] - non0;
-
+		// move direction, grad to gpu
 		direction_dev = ALLOCATE_GPU<double>(direction_dev, N * sizeof(double));
 		grad_dev = ALLOCATE_GPU<double>(grad_dev, N * sizeof(double));
-		tmp_dev = ALLOCATE_GPU<double>(tmp_dev, N * sizeof(double));
-		res_dev = ALLOCATE_GPU<double>(res_dev, sizeof(double));
-		grad_grad_dev = ALLOCATE_GPU<double>(grad_grad_dev, sizeof(double));
-		grad_direc_dev = ALLOCATE_GPU<double>(grad_grad_dev, sizeof(double));
+		COPYDATATOGPU<double>(direction_dev, direction.data(), N * sizeof(double));
+		COPYDATATOGPU<double>(grad_dev, grad.data(), N * sizeof(double));
 
-		COPYDATATOGPU<double>(direction_dev, direction_host, N * sizeof(double));
-		COPYDATATOGPU<double>(grad_dev, grad_host, N * sizeof(double));
-		COPYDATATOGPU<double>(tmp_dev, grad_host, N * sizeof(double));
+		// move hessian to gpu (compressed format)
+		const int non0 = hessian.nonZeros();
+		polyfem::logger().trace("non0: {}, cols: {}, rows: {}, allocating size: {} bytes", non0, hessian.cols(), hessian.rows(), non0 * sizeof(double));
+		int *row_dev, *col_dev;
+		// row_dev = ALLOCATE_GPU<int>(row_dev, (N+1)*sizeof(int));
+		// col_dev = ALLOCATE_GPU<int>(col_dev, non0*sizeof(int));
+		// hessian_dev = ALLOCATE_GPU<double>(hessian_dev, non0*sizeof(double));
+		EigenSparseToCuSparseTranspose(hessian, row_dev, col_dev, hessian_dev);
+
+		// compute residual
+		// const double residual = (hessian * direction + grad).norm(); // H Δx + g = 0
+		tmp_dev = ALLOCATE_GPU<double>(tmp_dev, N * sizeof(double));
+		COPYDATATOGPU<double>(tmp_dev, grad.data(), N * sizeof(double));
+		residual_dev = ALLOCATE_GPU<double>(residual_dev, sizeof(double));
 
 		cusparseStatus_t status;
 		cusparseHandle_t handle = 0;
@@ -281,10 +268,11 @@ namespace cppoptlib
 		status = cusparseCreate(&handle);
 		status = cusparseCreateMatDescr(&descr);
 		cusparseSetMatType(descr, CUSPARSE_MATRIX_TYPE_GENERAL);
-		cusparseIndexBase_t cubase;
 		cusparseSetMatIndexBase(descr, CUSPARSE_INDEX_BASE_ZERO);
 		double *buffer;
 		buffer = ALLOCATE_GPU<double>(buffer, 2 * non0 * sizeof(double));
+		double alpha = 1.0;
+		double beta = 1.0;
 		status = cusparseCsrmvEx(handle, CUSPARSE_ALG_MERGE_PATH, CUSPARSE_OPERATION_NON_TRANSPOSE, N, N, non0, &alpha, CUDA_R_64F, descr, hessian_dev, CUDA_R_64F, row_dev, col_dev, direction_dev, CUDA_R_64F, &beta, CUDA_R_64F, tmp_dev, CUDA_R_64F, CUDA_R_64F, buffer);
 		cusparseDestroyMatDescr(descr);
 		cusparseDestroy(handle);
@@ -294,27 +282,31 @@ namespace cppoptlib
 
 		cublasHandle_t handle2;
 		cublasCreate(&handle2);
-		cublasDdot(handle2, N, tmp_dev, 1, tmp_dev, 1, res_dev); // dot product
-		COPYDATATOHOST<double>(res_host, res_dev, sizeof(double));
-		const double residual = std::sqrt(*res_host); // norm
+		cublasDnrm2(handle2, N, tmp_dev, 1, residual_h);
 
-		cublasDdot(handle2, N, grad_dev, 1, grad_dev, 1, grad_grad_dev);
-		cublasDdot(handle2, N, grad_dev, 1, direction_dev, 1, grad_direc_dev);
-		COPYDATATOHOST<double>(grad_grad_host, grad_grad_dev, sizeof(double));
-		COPYDATATOHOST<double>(grad_direc_host, grad_direc_dev, sizeof(double));
-		const double grad_norm = std::sqrt(*grad_grad_host);
-		const double grad_direc_prod = *grad_direc_host;
+		// compute grad norm, grad direction dot product
+		grad_norm_dev = ALLOCATE_GPU<double>(grad_norm_dev, sizeof(double));
+		grad_dir_dot_dev = ALLOCATE_GPU<double>(grad_dir_dot_dev, sizeof(double));
 
-		delete[] res_host;
-		delete[] tmp_host;
-		delete[] grad_grad_host;
-		delete[] grad_direc_host;
+		cublasDnrm2(handle2, N, grad_dev, 1, grad_norm_h);
+		cublasDdot(handle2, N, grad_dev, 1, direction_dev, 1, grad_dir_dot_h);
+		cublasDestroy(handle2);
+
 		cudaFree(hessian_dev);
 		cudaFree(direction_dev);
 		cudaFree(grad_dev);
 		cudaFree(tmp_dev);
-		cudaFree(res_dev);
-		cublasDestroy(handle2);
+		cudaFree(residual_dev);
+		cudaFree(grad_norm_dev);
+		cudaFree(grad_dir_dot_dev);
+
+		const double residual = *residual_h;
+		const double grad_norm = *grad_norm_h;
+		const double grad_dir_dot = *grad_dir_dot_h;
+
+		delete[] residual_h;
+		delete[] grad_norm_h;
+		delete[] grad_dir_dot_h;
 
 		// gradient descent, check descent direction
 
@@ -342,13 +334,13 @@ namespace cppoptlib
 		}
 
 		// do this check here because we need to repeat the solve without resetting reg_weight
-		if (grad_direc_prod >= 0)
+		if (grad_dir_dot >= 0)
 		{
 			increase_descent_strategy();
 			polyfem::logger().log(
 				this->descent_strategy == 2 ? spdlog::level::warn : spdlog::level::debug,
 				"[{}] direction is not a descent direction (Δx⋅g={}≥0); reverting to {}",
-				name(), direction.dot(grad), descent_strategy_name());
+				name(), grad_dir_dot, descent_strategy_name());
 			return false;
 		}
 

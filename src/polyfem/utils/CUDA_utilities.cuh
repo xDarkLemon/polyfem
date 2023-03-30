@@ -79,15 +79,15 @@ void COPYDATATOGPU(X *d_A, const X *A, int _size)
 	}
 }
 
-template <typename A>
-void EigenSparseToCuSparseTranspose(const Eigen::SparseMatrix<double> &mat, int *row, int *col, A *val)
-{
-	const int num_non0 = mat.nonZeros();
-	const int num_outer = mat.cols() + 1;
-	cudaMemcpy(row, mat.outerIndexPtr(), sizeof(int) * num_outer, cudaMemcpyHostToDevice);
-	cudaMemcpy(col, mat.innerIndexPtr(), sizeof(int) * num_non0, cudaMemcpyHostToDevice);
-	cudaMemcpy(val, mat.valuePtr(), sizeof(A) * num_non0, cudaMemcpyHostToDevice);
-}
+// template <typename A>
+// void EigenSparseToCuSparseTranspose(const Eigen::SparseMatrix<double> &mat, int *row, int *col, A *val)
+//{
+//	const int num_non0 = mat.nonZeros();
+//	const int num_outer = mat.cols() + 1;
+//	cudaMemcpy(row, mat.outerIndexPtr(), sizeof(int) * num_outer, cudaMemcpyHostToDevice);
+//	cudaMemcpy(col, mat.innerIndexPtr(), sizeof(int) * num_non0, cudaMemcpyHostToDevice);
+//	cudaMemcpy(val, mat.valuePtr(), sizeof(A) * num_non0, cudaMemcpyHostToDevice);
+// }
 
 template <typename T>
 void COPYDATATOHOST(T *A, T *d_A, int _size)
@@ -143,10 +143,10 @@ namespace polyfem
 
 		Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, 0, 3, 3> *jac_it_dev_ptr;
 		basis::Local2Global_GPU *global_data_dev_ptr;
-		Eigen::Matrix<double, -1, 1, 0, 6, 1> *da_dev_ptr;
-		Eigen::Matrix<double, -1, 1, 0, 6, 1> *val_dev_ptr;
-		Eigen::Matrix<double, -1, -1, 0, 6, 3> *grad_dev_ptr;
-		Eigen::Matrix<double, -1, -1, 0, 6, 3> *forces_dev_ptr;
+		Eigen::Matrix<double, -1, 1, 0, 4, 1> *da_dev_ptr;
+		Eigen::Matrix<double, -1, 1, 0, 4, 1> *val_dev_ptr;
+		Eigen::Matrix<double, -1, -1, 0, 4, 3> *grad_dev_ptr;
+		Eigen::Matrix<double, -1, -1, 0, 4, 3> *forces_dev_ptr;
 		double *mu_ptr;
 		double *lambda_ptr;
 		double *rho_ptr;

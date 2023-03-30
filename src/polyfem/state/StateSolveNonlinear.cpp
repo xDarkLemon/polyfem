@@ -145,10 +145,10 @@ namespace polyfem
 
 		Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, 0, 3, 3> *jac_it_dev_ptr = nullptr;
 		basis::Local2Global_GPU *global_data_dev_ptr = nullptr;
-		Eigen::Matrix<double, -1, 1, 0, 6, 1> *da_dev_ptr = nullptr;
-		Eigen::Matrix<double, -1, 1, 0, 6, 1> *val_dev_ptr = nullptr;
-		Eigen::Matrix<double, -1, -1, 0, 6, 3> *grad_dev_ptr = nullptr;
-		Eigen::Matrix<double, -1, -1, 0, 6, 3> *forces_dev_ptr = nullptr;
+		Eigen::Matrix<double, -1, 1, 0, 4, 1> *da_dev_ptr = nullptr;
+		Eigen::Matrix<double, -1, 1, 0, 4, 1> *val_dev_ptr = nullptr;
+		Eigen::Matrix<double, -1, -1, 0, 4, 3> *grad_dev_ptr = nullptr;
+		Eigen::Matrix<double, -1, -1, 0, 4, 3> *forces_dev_ptr = nullptr;
 		double *lambda_ptr = nullptr;
 		double *mu_ptr = nullptr;
 		double *rho_ptr = nullptr;
@@ -160,17 +160,17 @@ namespace polyfem
 		auto g_bases = geom_bases();
 
 		Eigen::MatrixXd forces_host;
-		Eigen::Matrix<double, -1, -1, 0, 6, 3> forces_;
+		Eigen::Matrix<double, -1, -1, 0, 4, 3> forces_;
 
-		forces_dev_ptr = ALLOCATE_GPU(forces_dev_ptr, sizeof(Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, 0, 6, 3>) * n_elements);
+		forces_dev_ptr = ALLOCATE_GPU(forces_dev_ptr, sizeof(Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, 0, 4, 3>) * n_elements);
 
 		for (int e = 0; e < n_elements; ++e)
 		{
 			ass_vals_cache.compute(e, is_vol_, bases[e], g_bases[e], vals_array[e]);
 			// to do: check if parameter t = 0 will affect the forces variable;
 			(problem.get())->rhs(assembler, formulation(), vals_array[e].val, 0, forces_host);
-			forces_ = Eigen::Map<Eigen::Matrix<double, -1, -1, 0, 6, 3>>(forces_host.data(), 6, 3);
-			COPYDATATOGPU(forces_dev_ptr + e, &forces_, sizeof(Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, 0, 6, 3>));
+			forces_ = Eigen::Map<Eigen::Matrix<double, -1, -1, 0, 4, 3>>(forces_host.data(), 4, 3);
+			COPYDATATOGPU(forces_dev_ptr + e, &forces_, sizeof(Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, 0, 4, 3>));
 		}
 
 		logger().info("Finished computing cache for GPU");
@@ -185,7 +185,7 @@ namespace polyfem
 
 		global_data_dev_ptr = ALLOCATE_GPU(global_data_dev_ptr, sizeof(basis::Local2Global_GPU) * n_elements * n_loc_bases * global_vector_size);
 
-		std::vector<Eigen::Matrix<double, -1, 1, 0, 6, 1>> da_host(n_elements);
+		std::vector<Eigen::Matrix<double, -1, 1, 0, 4, 1>> da_host(n_elements);
 
 		for (int e = 0; e < n_elements; ++e)
 		{
@@ -193,6 +193,7 @@ namespace polyfem
 			da_host[e].resize(N, 1);
 			da_host[e] = vals_array[e].det.array() * vals_array[e].quadrature.weights.array();
 			COPYDATATOGPU(jac_it_dev_ptr + e * jac_it_size, vals_array[e].jac_it.data(), sizeof(Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, 0, 3, 3>) * jac_it_size);
+
 			for (int f = 0; f < n_loc_bases; f++)
 			{
 				for (int g = 0; g < global_vector_size; g++)
@@ -204,22 +205,22 @@ namespace polyfem
 		}
 		COPYDATATOGPU(global_data_dev_ptr, global_data_host.data(), sizeof(basis::Local2Global_GPU) * n_elements * n_loc_bases * global_vector_size);
 
-		da_dev_ptr = ALLOCATE_GPU(da_dev_ptr, sizeof(Eigen::Matrix<double, -1, 1, 0, 6, 1>) * n_elements);
-		COPYDATATOGPU(da_dev_ptr, da_host.data(), sizeof(Eigen::Matrix<double, -1, 1, 0, 6, 1>) * n_elements);
+		da_dev_ptr = ALLOCATE_GPU(da_dev_ptr, sizeof(Eigen::Matrix<double, -1, 1, 0, 4, 1>) * n_elements);
+		COPYDATATOGPU(da_dev_ptr, da_host.data(), sizeof(Eigen::Matrix<double, -1, 1, 0, 4, 1>) * n_elements);
 
 		n_pts = da_host[0].size();
 
-		grad_dev_ptr = ALLOCATE_GPU(grad_dev_ptr, sizeof(Eigen::Matrix<double, -1, -1, 0, 6, 3>) * n_elements * n_loc_bases);
-		val_dev_ptr = ALLOCATE_GPU(val_dev_ptr, sizeof(Eigen::Matrix<double, -1, -1, 0, 6, 1>) * n_elements * n_loc_bases);
+		grad_dev_ptr = ALLOCATE_GPU(grad_dev_ptr, sizeof(Eigen::Matrix<double, -1, -1, 0, 4, 3>) * n_elements * n_loc_bases);
+		val_dev_ptr = ALLOCATE_GPU(val_dev_ptr, sizeof(Eigen::Matrix<double, -1, -1, 0, 4, 1>) * n_elements * n_loc_bases);
 
 		for (int e = 0; e < n_elements; ++e)
 		{
 			for (int f = 0; f < n_loc_bases; f++)
 			{
-				Eigen::Matrix<double, -1, -1, 0, 6, 3> row_(Eigen::Map<Eigen::Matrix<double, -1, -1, 0, 6, 3>>(vals_array[e].basis_values[f].grad.data(), 6, 3));
-				Eigen::Matrix<double, -1, 1, 0, 6, 1> val_ = vals_array[e].basis_values[f].val;
-				COPYDATATOGPU(grad_dev_ptr + e * n_loc_bases + f, &row_, sizeof(Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, 0, 6, 3>));
-				COPYDATATOGPU(val_dev_ptr + e * n_loc_bases + f, &val_, sizeof(Eigen::Matrix<double, Eigen::Dynamic, 1, 0, 6, 1>));
+				Eigen::Matrix<double, -1, -1, 0, 4, 3> row_(Eigen::Map<Eigen::Matrix<double, -1, -1, 0, 4, 3>>(vals_array[e].basis_values[f].grad.data(), 4, 3));
+				Eigen::Matrix<double, -1, 1, 0, 4, 1> val_ = vals_array[e].basis_values[f].val;
+				COPYDATATOGPU(grad_dev_ptr + e * n_loc_bases + f, &row_, sizeof(Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, 0, 4, 3>));
+				COPYDATATOGPU(val_dev_ptr + e * n_loc_bases + f, &val_, sizeof(Eigen::Matrix<double, Eigen::Dynamic, 1, 0, 4, 1>));
 			}
 		}
 

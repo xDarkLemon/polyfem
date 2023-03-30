@@ -11,7 +11,7 @@ include(FetchContent)
 FetchContent_Declare(
     polysolve
     GIT_REPOSITORY https://github.com/AlexTru96/polysolve.git
-    GIT_TAG fe05427cd799a746f4cc01caf8fadbe6977323f5
+    GIT_TAG 5ac5e5602e0d910159c9a1549c388b873edcb660
     GIT_SHALLOW FALSE
 )
 FetchContent_MakeAvailable(polysolve)

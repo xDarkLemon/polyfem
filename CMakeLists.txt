@@ -139,38 +139,6 @@ include(sanitizers)
 add_library(polyfem)
 add_library(polyfem::polyfem ALIAS polyfem)
 
-# ###############################################################################
-# CUDA
-# ###############################################################################
-if(IPC_TOOLKIT_WITH_CUDA OR POLYSOLVE_WITH_CUSOLVER OR WITH_GPU)
-    include(CheckLanguage)
-    check_language(CUDA)
-
-    if(CMAKE_CUDA_COMPILER)
-        enable_language(CUDA)
-    else()
-        message(FATAL_ERROR "No CUDA support found!")
-    endif()
-
-    set_target_properties(polyfem PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
-
-    # Nvidia RTX8000 -> compute_75
-    # Nvidia V100 -> compute_70
-    # Nvidia 1080/1080Ti -> compute_61
-    # Nvidia 3080Ti -> compute_86
-    if(NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
-        set(CMAKE_CUDA_ARCHITECTURES 70 75 86)
-    endif()
-
-    set_target_properties(polyfem PROPERTIES CUDA_ARCHITECTURES "70;75;86")
-    target_link_libraries(polyfem PUBLIC
-        -lcublas
-        -lcurand
-        ${CUDA_cusparse_LIBRARY})
-
-    # set_target_properties(PolyFEM_bin PROPERTIES CUDA_ARCHITECTURES "70;75;86")
-endif()
-
 # Must be call in the same "CMakeLists.txt" where add_library(polyfem ...) is called
 polyfem_autogen(polyfem eigs.py auto_eigs)
 polyfem_autogen(polyfem p_bases.py auto_p_bases)
@@ -372,4 +340,36 @@ if(POLYFEM_TOPLEVEL_PROJECT)
         enable_testing()
         add_subdirectory(tests)
     endif()
+endif()
+
+# ###############################################################################
+# CUDA
+# ###############################################################################
+if(IPC_TOOLKIT_WITH_CUDA OR POLYSOLVE_WITH_CUSOLVER OR WITH_GPU)
+    include(CheckLanguage)
+    check_language(CUDA)
+
+    if(CMAKE_CUDA_COMPILER)
+        enable_language(CUDA)
+    else()
+        message(FATAL_ERROR "No CUDA support found!")
+    endif()
+
+    set_target_properties(polyfem PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
+
+    # Nvidia RTX8000 -> compute_75
+    # Nvidia V100 -> compute_70
+    # Nvidia 1080/1080Ti -> compute_61
+    # Nvidia 3080Ti -> compute_86
+    if(NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
+        set(CMAKE_CUDA_ARCHITECTURES 70 75 86)
+    endif()
+
+    set_target_properties(polyfem PROPERTIES CUDA_ARCHITECTURES "70;75;86")
+    target_link_libraries(polyfem PUBLIC
+        -lcublas
+        -lcurand
+        -lcusparse)
+
+    set_target_properties(PolyFEM_bin PROPERTIES CUDA_ARCHITECTURES "70;75;86")
 endif()

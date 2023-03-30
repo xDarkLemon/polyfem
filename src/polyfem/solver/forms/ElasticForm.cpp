@@ -57,9 +57,13 @@ namespace polyfem::solver
 	{
 #ifdef USE_GPU
 		if (formulation_ == "NeoHookean")
-			return assembler_.assemble_energy_GPU(
+			return assembler_.assemble_energy(
 				formulation_, is_volume_, bases_, geom_bases_,
-				ass_vals_cache_, dt_, x, x_prev_, data_gpu_);
+				ass_vals_cache_, dt_, x, x_prev_);
+		//			return assembler_.assemble_energy_GPU(
+		//				formulation_, is_volume_, bases_, geom_bases_,
+		//				ass_vals_cache_, dt_, x, x_prev_, data_gpu_);
+		// FIX IS REQUIRED (ACCURACY PROBLEM)
 		else
 			return assembler_.assemble_energy(
 				formulation_, is_volume_, bases_, geom_bases_,

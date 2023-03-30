@@ -22,10 +22,10 @@ namespace polyfem
 	{
 		using namespace basis;
 		__global__ void compute_energy_rhs_GPU(double *displacement,
-											   Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, 0, 6, 3> *forces_array,
+											   Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, 0, 4, 3> *forces_array,
 											   Local2Global_GPU *global_data,
-											   Eigen::Matrix<double, -1, 1, 0, 6, 1> *da,
-											   Eigen::Matrix<double, -1, 1, 0, 6, 1> *val,
+											   Eigen::Matrix<double, -1, 1, 0, 4, 1> *da,
+											   Eigen::Matrix<double, -1, 1, 0, 4, 1> *val,
 											   int n_bases,
 											   int n_loc_bases,
 											   int global_vector_size,
@@ -41,7 +41,7 @@ namespace polyfem
 			if (b_index < n_bases)
 			{
 				Eigen::Matrix<double, -1, 1, 0, 3, 1> local_dispv(_size);
-				Eigen::Matrix<double, -1, -1, 0, 6, 3> forces(n_pts, _size);
+				Eigen::Matrix<double, -1, -1, 0, 4, 3> forces(n_pts, _size);
 
 				double energy = double(0.0);
 

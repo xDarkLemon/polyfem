@@ -6,6 +6,8 @@
 #include "polyfem/utils/CuSparseUtils.cuh"
 #endif
 
+#include <polyfem/utils/save_problem.hpp>
+
 namespace cppoptlib
 {
 	template <typename ProblemType>
@@ -139,6 +141,14 @@ namespace cppoptlib
 	bool SparseNewtonDescentSolver<ProblemType>::solve_linear_system(
 		polyfem::StiffnessMatrix &hessian, const TVector &grad, TVector &direction)
 	{
+		using namespace benchy::io;
+		benchy::io::Problem<double> probleminfo;
+		probleminfo.A = hessian;
+		probleminfo.b = -grad;
+		benchy::io::iter_global = benchy::io::iter_global+1;  // starts from 1
+		std::cout << "TIME STEP: " << benchy::io::ts_global << " ITER: " << benchy::io::iter_global << std::endl;
+		benchy::io::save_problem(probleminfo);
+
 		POLYFEM_SCOPED_TIMER("linear solve", this->inverting_time);
 		// TODO: get the correct size
 		linear_solver->analyzePattern(hessian, hessian.rows());
@@ -180,7 +190,7 @@ namespace cppoptlib
 			// polyfem::write_sparse_matrix_csv("problematic_hessian.csv", hessian);
 			return false;
 		}
-
+		
 		linear_solver->solve(-grad, direction); // H Δx = -g
 
 		return true;

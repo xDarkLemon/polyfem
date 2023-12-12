@@ -23,6 +23,8 @@
 
 #include <ipc/ipc.hpp>
 
+#include <polyfem/utils/save_problem.hpp>
+
 namespace polyfem
 {
 	using namespace mesh;
@@ -68,6 +70,11 @@ namespace polyfem
 
 		for (int t = 1; t <= time_steps; ++t)
 		{
+
+			benchy::io::ts_global=t;
+			benchy::io::iter_global=0;
+			std::cout << "UPDATE TIME STEP: " << benchy::io::ts_global << " UPDATE ITER: " << benchy::io::iter_global << std::endl;
+
 			solve_tensor_nonlinear(sol, t);
 
 			{

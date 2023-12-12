@@ -11,6 +11,8 @@
 
 #include <polysolve/LinearSolver.hpp>
 
+#include <polyfem/utils/save_problem.hpp>
+
 bool has_arg(const CLI::App &command_line, const std::string &value)
 {
 	const auto *opt = command_line.get_option_no_throw(value.size() == 1 ? ("-" + value) : ("--" + value));
@@ -47,6 +49,9 @@ int main(int argc, char **argv)
 
 	bool fallback_solver = false;
 	command_line.add_flag("--enable_overwrite_solver", fallback_solver, "If solver in json is not present, falls back to default");
+
+	std::string mat_dir = "";
+	command_line.add_option("--mat_dir", mat_dir, "Problem matrix save dir")->check(CLI::ExistingDirectory | CLI::NonexistentPath);
 
 	// const std::vector<std::string> solvers = polysolve::LinearSolver::availableSolvers();
 	// std::string solver;
@@ -126,6 +131,9 @@ int main(int argc, char **argv)
 	if (has_arg(command_line, "enable_overwrite_solver"))
 		tmp["/solver/linear/enable_overwrite_solver"_json_pointer] = fallback_solver;
 	in_args.merge_patch(tmp);
+
+	benchy::io::mat_save_global=mat_dir;
+	std::cout << "MAT_DIR: " << benchy::io::mat_save_global << std::endl;
 
 	State state;
 	state.init(in_args, is_strict);

@@ -48,6 +48,8 @@ set(SOURCES
 	StringUtils.hpp
 	Timer.hpp
 	Types.hpp
+	save_problem.hpp
+	save_problem.cpp
 )
 
 prepend_current_path(SOURCES)

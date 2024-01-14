@@ -45,6 +45,8 @@
 #include <filesystem>
 
 #include <polyfem/utils/autodiff.h>
+#include <polyfem/utils/save_problem.hpp>
+
 DECLARE_DIFFSCALAR_BASE();
 
 using namespace Eigen;
@@ -541,6 +543,10 @@ namespace polyfem
 		poly_edge_to_data.clear();
 		stiffness.resize(0, 0);
 		rhs.resize(0, 0);
+
+		using namespace benchy::io;
+		benchy::io::dim_global = mesh->dimension();
+		std::cout << "DIM UPDATE: " << benchy::io::dim_global << std::endl;
 
 		if (formulation() == "MultiModels")
 		{

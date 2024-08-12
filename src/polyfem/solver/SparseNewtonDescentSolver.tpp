@@ -7,6 +7,7 @@
 #endif
 
 #include <polyfem/utils/save_problem.hpp>
+#include <polyfem/utils/Nullspace.hpp>
 
 namespace cppoptlib
 {
@@ -147,6 +148,7 @@ namespace cppoptlib
 		probleminfo.b = -grad;
 		benchy::io::iter_global = benchy::io::iter_global+1;  // starts from 1
 		std::cout << "TIME STEP: " << benchy::io::ts_global << " ITER: " << benchy::io::iter_global << std::endl;
+		probleminfo.nullspace = remove_boundary_vertices(test_vertices, test_boundary_nodes);
 		benchy::io::save_problem(probleminfo);
 
 		POLYFEM_SCOPED_TIMER("linear solve", this->inverting_time);

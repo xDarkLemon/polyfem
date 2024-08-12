@@ -12,6 +12,7 @@
 #include <polysolve/LinearSolver.hpp>
 
 #include <polyfem/utils/save_problem.hpp>
+// #include <polyfem/utils/Nullspace.hpp>
 
 bool has_arg(const CLI::App &command_line, const std::string &value)
 {

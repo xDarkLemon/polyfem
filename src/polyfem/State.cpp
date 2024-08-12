@@ -46,6 +46,7 @@
 
 #include <polyfem/utils/autodiff.h>
 #include <polyfem/utils/save_problem.hpp>
+#include <polyfem/utils/Nullspace.hpp>
 
 DECLARE_DIFFSCALAR_BASE();
 
@@ -1326,6 +1327,27 @@ namespace polyfem
 		igl::Timer timer;
 		timer.start();
 		logger().info("Solving {}", formulation());
+
+		if(assembler.is_linear(formulation()))
+		{
+			Eigen::MatrixXi tempF;
+			build_mesh_matrices(test_vertices,tempF);
+			test_boundary_nodes.clear();
+		}
+		else{
+			Eigen::MatrixXi tempV,tempF;
+			build_mesh_matrices(test_vertices,tempF);
+			int dim = mesh->dimension();
+			std::vector<int> order_nodes;
+			for (int i=0;i<boundary_nodes.size();i=i+dim)
+			{
+				order_nodes.push_back(boundary_nodes[i]/dim);
+			}
+			std::sort(order_nodes.begin(), order_nodes.end());
+			test_boundary_nodes=order_nodes;
+
+			// init_mesh_vertices(test_vertices);
+		}
 
 		const std::string full_mat_path = args["output"]["data"]["full_mat"];
 		if (!full_mat_path.empty())

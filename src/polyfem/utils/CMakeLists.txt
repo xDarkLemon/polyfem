@@ -50,6 +50,8 @@ set(SOURCES
 	Types.hpp
 	save_problem.hpp
 	save_problem.cpp
+	Nullspace.hpp
+	Nullspace.cpp
 )
 
 prepend_current_path(SOURCES)

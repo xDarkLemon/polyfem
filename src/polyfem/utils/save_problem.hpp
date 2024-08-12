@@ -124,6 +124,9 @@ struct Problem
 
     /// Right-hand side dense matrix. To save multiple rhs, use separate columns.
     Eigen::Matrix<Scalar, Eigen::Dynamic, Eigen::Dynamic> b;
+
+    /// Nullspace
+    Eigen::Matrix<Scalar, Eigen::Dynamic, Eigen::Dynamic> nullspace;
 };
 
 ///
@@ -165,6 +168,7 @@ bool save_problem(const Problem<Scalar>& problem)
     // write binary
     std::string filename1=mat_save_global+"/"+std::to_string(ts_global)+"_"+std::to_string(iter_global)+"_A.bin";
     std::string filename2=mat_save_global+"/"+std::to_string(ts_global)+"_"+std::to_string(iter_global)+"_b.bin";
+    std::string filename3=mat_save_global+"/"+std::to_string(ts_global)+"_"+std::to_string(iter_global)+"_nullspace.bin";
 
     // write A
     Serialize(problem.A, dim_global, 1, 1, filename1);
@@ -196,6 +200,19 @@ bool save_problem(const Problem<Scalar>& problem)
 
     // printf("DESERIALIZING b\n");
     // std::cout << b_ << "\n" << std::endl;
+
+    // write nullspace
+    WriteMat(problem.nullspace, filename3);
+
+    // printf("SERIALIZING nullspace\n");
+    // std::cout << problem.nullspace << "\n" << std::endl;
+
+    // // load b
+    // Eigen::MatrixXd nullspace_;
+    // ReadMat(nullspace_, filename3);
+
+    // printf("DESERIALIZING nullspace\n");
+    // std::cout << nullspace_ << "\n" << std::endl;
 
     return true;
 }

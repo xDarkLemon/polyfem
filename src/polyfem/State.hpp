@@ -460,6 +460,8 @@ namespace polyfem
 		/// Build the mesh matrices (vertices and elements) from the mesh using the bases node ordering
 		void build_mesh_matrices(Eigen::MatrixXd &V, Eigen::MatrixXi &F);
 
+		/// For nullspace vectors
+		void init_mesh_vertices(Eigen::MatrixXd &V);
 		//---------------------------------------------------
 		//-----------------IPC-------------------------------
 		//---------------------------------------------------
